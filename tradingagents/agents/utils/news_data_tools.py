@@ -25,6 +25,10 @@ def get_global_news(
     curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
     look_back_days: Annotated[Optional[int], "Days to look back; omit to use the configured default"] = None,
     limit: Annotated[Optional[int], "Max articles to return; omit to use the configured default"] = None,
+    ticker: Annotated[
+        Optional[str],
+        "Optional ticker; when set on CN runs, merges industry-specific search queries",
+    ] = None,
 ) -> str:
     """
     Retrieve global news data.
@@ -32,14 +36,25 @@ def get_global_news(
     limit come from DEFAULT_CONFIG (global_news_lookback_days,
     global_news_article_limit); pass explicit values to override.
 
+    On China A-share runs, ``ticker_news_queries`` (from the ticker's industry)
+    are merged with ``global_news_queries`` automatically when ``propagate()``
+    starts; pass ``ticker`` here only if you need a one-off override.
+
     Args:
         curr_date (str): Current date in yyyy-mm-dd format
         look_back_days (int): Number of days to look back; omit to inherit config
         limit (int): Maximum number of articles to return; omit to inherit config
+        ticker (str): Optional symbol to refresh industry queries for this call
 
     Returns:
         str: A formatted string containing global news data
     """
+    if ticker:
+        from tradingagents.dataflows.config import get_config, set_config
+        from tradingagents.dataflows.sector_queries import apply_ticker_news_queries
+
+        cfg = apply_ticker_news_queries(ticker, get_config())
+        set_config(cfg)
     return route_to_vendor("get_global_news", curr_date, look_back_days, limit)
 
 @tool

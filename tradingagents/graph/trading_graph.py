@@ -18,13 +18,18 @@ from tradingagents.llm_clients import create_llm_client
 from tradingagents.agents import *
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.agents.utils.memory import TradingMemoryLog
-from tradingagents.dataflows.utils import safe_ticker_component
+from tradingagents.dataflows.report_paths import (
+    build_report_bundle_name,
+    report_bundle_dir,
+    resolve_stock_display_name,
+)
 from tradingagents.agents.utils.agent_states import (
     AgentState,
     InvestDebateState,
     RiskDebateState,
 )
 from tradingagents.dataflows.config import set_config
+from tradingagents.dataflows.sector_queries import apply_ticker_news_queries
 
 # Import the new abstract tool methods from agent_utils
 from tradingagents.agents.utils.agent_utils import (
@@ -45,6 +50,8 @@ from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
+from .progress_log import GraphProgressLogger, progress_logging_enabled
+from .report_export import save_analysis_report_md
 
 
 class TradingAgentsGraph:
@@ -224,6 +231,14 @@ class TradingAgentsGraph:
         unavailable (too recent, delisted, or network error).
         """
         try:
+            from tradingagents.market import cn_uses_a_share_skill
+            from tradingagents.dataflows.a_share_returns import fetch_raw_and_alpha_returns
+
+            if cn_uses_a_share_skill(ticker, self.config):
+                return fetch_raw_and_alpha_returns(
+                    ticker, benchmark, trade_date, holding_days
+                )
+
             start = datetime.strptime(trade_date, "%Y-%m-%d")
             end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
             end_str = end.strftime("%Y-%m-%d")
@@ -335,6 +350,41 @@ class TradingAgentsGraph:
 
     def _run_graph(self, company_name, trade_date, asset_type: str = "stock"):
         """Execute the graph and write the resulting state to disk and memory log."""
+        self.config = apply_ticker_news_queries(company_name, self.config)
+        set_config(self.config)
+        extra = self.config.get("ticker_news_queries") or []
+        if extra:
+            logger.info(
+                "Appended %d ticker industry news queries for %s: %s",
+                len(extra),
+                company_name,
+                extra,
+            )
+
+        progress_extra = []
+        if extra:
+            progress_extra.append(
+                f"行业新闻查询 +{len(extra)}: {', '.join(str(q)[:40] for q in extra[:3])}"
+                + (" …" if len(extra) > 3 else "")
+            )
+
+        from tradingagents.dataflows.cn_prefetch import run_cn_prefetch
+        from tradingagents.market import cn_uses_a_share_skill
+
+        if cn_uses_a_share_skill(company_name, self.config):
+            workers = max(1, int(self.config.get("analyst_concurrency_limit", 4)))
+            prefetch_lines = run_cn_prefetch(
+                company_name,
+                str(trade_date),
+                self.config,
+                max_workers=workers,
+            )
+            progress_extra = (
+                [f"分析师并行度: {workers}（市场/情绪/新闻/基本面同时跑）"]
+                + prefetch_lines[:6]
+                + progress_extra
+            )
+
         # Initialize state — inject memory log context for PM.
         past_context = self.memory_log.get_past_context(company_name)
         init_agent_state = self.propagator.create_initial_state(
@@ -347,6 +397,7 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
+        progress_logger = None
         if self.debug:
             trace = []
             for chunk in self.graph.stream(init_agent_state, **args):
@@ -360,14 +411,25 @@ class TradingAgentsGraph:
             final_state = {}
             for chunk in trace:
                 final_state.update(chunk)
+        elif progress_logging_enabled(self.config):
+            progress_logger = GraphProgressLogger(company_name, str(trade_date))
+            progress_logger.log_start(progress_extra or None)
+            final_state = progress_logger.run_stream(
+                self.graph, init_agent_state, args
+            )
         else:
             final_state = self.graph.invoke(init_agent_state, **args)
 
         # Store current state for reflection.
         self.curr_state = final_state
 
-        # Log state to disk.
-        self._log_state(trade_date, final_state)
+        # Log state to disk (JSON + markdown).
+        md_path = self._log_state(trade_date, final_state)
+        if progress_logger is not None:
+            progress_logger.log_finish(
+                self.process_signal(final_state.get("final_trade_decision") or ""),
+                md_report_path=str(md_path) if md_path else None,
+            )
 
         # Store decision for deferred reflection on the next same-ticker run.
         self.memory_log.store_decision(
@@ -384,8 +446,8 @@ class TradingAgentsGraph:
 
         return final_state, self.process_signal(final_state["final_trade_decision"])
 
-    def _log_state(self, trade_date, final_state):
-        """Log the final state to a JSON file."""
+    def _log_state(self, trade_date, final_state) -> Optional[Path]:
+        """Log final state to JSON and markdown; return path to complete_report.md."""
         self.log_states_dict[str(trade_date)] = {
             "company_of_interest": final_state["company_of_interest"],
             "trade_date": final_state["trade_date"],
@@ -416,15 +478,23 @@ class TradingAgentsGraph:
             "final_trade_decision": final_state["final_trade_decision"],
         }
 
-        # Save to file. Reject ticker values that would escape the
-        # results directory when joined as a path component.
-        safe_ticker = safe_ticker_component(self.ticker)
-        directory = Path(self.config["results_dir"]) / safe_ticker / "TradingAgentsStrategy_logs"
-        directory.mkdir(parents=True, exist_ok=True)
+        bundle = report_bundle_dir(self.config["results_dir"], self.ticker, trade_date)
+        bundle.mkdir(parents=True, exist_ok=True)
+        bundle_label = build_report_bundle_name(self.ticker, trade_date)
 
-        log_path = directory / f"full_states_log_{trade_date}.json"
+        log_path = bundle / f"{bundle_label}.json"
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(self.log_states_dict[str(trade_date)], f, indent=4)
+
+        md_path = save_analysis_report_md(
+            final_state,
+            self.ticker,
+            bundle,
+            trade_date=str(trade_date),
+            stock_name=resolve_stock_display_name(self.ticker),
+        )
+        logger.info("Markdown report written to %s", md_path)
+        return md_path
 
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""

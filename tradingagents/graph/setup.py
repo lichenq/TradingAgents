@@ -8,6 +8,7 @@ from tradingagents.agents import *
 from tradingagents.agents.utils.agent_states import AgentState
 
 from .analyst_execution import build_analyst_execution_plan
+from .analyst_join import ANALYST_JOIN_NODE, analysts_join_node
 from .conditional_logic import ConditionalLogic
 
 
@@ -84,17 +85,24 @@ class GraphSetup:
         workflow.add_node("Conservative Analyst", conservative_analyst)
         workflow.add_node("Portfolio Manager", portfolio_manager_node)
 
-        # Define edges
-        # Start with the first analyst
-        workflow.add_edge(START, plan.specs[0].agent_node)
+        parallel_analysts = (
+            self.analyst_concurrency_limit > 1 and len(plan.specs) > 1
+        )
 
-        # Connect analysts in sequence
+        if parallel_analysts:
+            workflow.add_node(ANALYST_JOIN_NODE, analysts_join_node)
+
+        # Analyst tool loops + routing (sequential chain or parallel fan-out)
         for i, spec in enumerate(plan.specs):
             current_analyst = spec.agent_node
             current_tools = spec.tool_node
             current_clear = spec.clear_node
 
-            # Add conditional edges for current analyst
+            if parallel_analysts:
+                workflow.add_edge(START, current_analyst)
+            elif i == 0:
+                workflow.add_edge(START, current_analyst)
+
             workflow.add_conditional_edges(
                 current_analyst,
                 getattr(self.conditional_logic, f"should_continue_{spec.key}"),
@@ -102,11 +110,15 @@ class GraphSetup:
             )
             workflow.add_edge(current_tools, current_analyst)
 
-            # Connect to next analyst or to Bull Researcher if this is the last analyst
-            if i < len(plan.specs) - 1:
+            if parallel_analysts:
+                workflow.add_edge(current_clear, ANALYST_JOIN_NODE)
+            elif i < len(plan.specs) - 1:
                 workflow.add_edge(current_clear, plan.specs[i + 1].agent_node)
             else:
                 workflow.add_edge(current_clear, "Bull Researcher")
+
+        if parallel_analysts:
+            workflow.add_edge(ANALYST_JOIN_NODE, "Bull Researcher")
 
         # Add remaining edges
         workflow.add_conditional_edges(

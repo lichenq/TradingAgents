@@ -17,6 +17,10 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_MAX_RISK_ROUNDS":      "max_risk_discuss_rounds",
     "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
     "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
+    "TRADINGAGENTS_MARKET":               "market_profile",
+    "TRADINGAGENTS_GLOBAL_NEWS_MODE":     "global_news_mode",
+    "TRADINGAGENTS_PROGRESS_LOG":        "progress_logging",
+    "TRADINGAGENTS_ANALYST_CONCURRENCY": "analyst_concurrency_limit",
 }
 
 
@@ -41,7 +45,65 @@ def _apply_env_overrides(config: dict) -> dict:
     return config
 
 
-DEFAULT_CONFIG = _apply_env_overrides({
+# CN ``get_global_news`` base queries: macro/policy only (not per-sector boards).
+# Per-stock industry queries are appended at runtime via ``ticker_news_queries``.
+CN_GLOBAL_NEWS_QUERIES = [
+    # 宏观 / 政策 / 资金（少量；板块由 ticker 行业动态追加）
+    "中国人民银行 货币政策 LPR 降准",
+    "A股 沪深300 北向资金 成交额 两市",
+    "证监会 政策 监管 立案 处罚",
+    "国务院 财政 专项债 化债 地方债",
+    "中美贸易 关税 出口 汇率",
+]
+
+
+def _cn_market_defaults() -> dict:
+    """Defaults applied when ``market_profile`` is ``cn``."""
+    return {
+        "output_language": "Chinese",
+        # CN: all market data via ~/.cursor/skills/a-share-data/run.sh (no Yahoo/AlphaVantage).
+        "data_vendors": {
+            "core_stock_apis": "a_share",
+            "technical_indicators": "a_share",
+            "fundamental_data": "a_share",
+            "news_data": "a_share",
+        },
+        # macro_plus_ticker: CN_GLOBAL_NEWS_QUERIES + ticker_news_queries (default)
+        "global_news_mode": "macro_plus_ticker",
+        "global_news_article_limit": 15,
+        "global_news_queries": list(CN_GLOBAL_NEWS_QUERIES),
+        "benchmark_map": {
+            ".NS": "^NSEI",
+            ".BO": "^BSESN",
+            ".T": "^N225",
+            ".HK": "^HSI",
+            ".L": "^FTSE",
+            ".TO": "^GSPTSE",
+            ".AX": "^AXJO",
+            ".SS": "000300.SS",
+            ".SZ": "000300.SS",
+            ".SH": "000300.SS",
+            "": "000300.SS",
+        },
+    }
+
+
+def apply_market_profile(config: dict) -> dict:
+    """Merge China A-share defaults when ``market_profile`` is ``cn`` or ``auto``+ticker."""
+    profile = (config.get("market_profile") or "us").strip().lower()
+    if profile in ("cn", "a", "a_share", "china"):
+        overrides = _cn_market_defaults()
+        for key, value in overrides.items():
+            if isinstance(value, dict) and isinstance(config.get(key), dict):
+                merged = dict(config[key])
+                merged.update(value)
+                config[key] = merged
+            else:
+                config[key] = value
+    return config
+
+
+DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
     "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
@@ -50,6 +112,8 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
+    # Market: "us" (default), "cn" (A-share via a-share-data skill), or "auto"
+    "market_profile": "us",
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.4",
@@ -74,7 +138,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
-    "analyst_concurrency_limit": 1,
+    # >1 runs market/sentiment/news/fundamentals in parallel (LangGraph fan-out).
+    "analyst_concurrency_limit": 4,
+    # Print stage-by-stage progress to stderr during propagate (off: TRADINGAGENTS_PROGRESS_LOG=0)
+    "progress_logging": True,
     # News / data fetching parameters
     # Increase for longer lookback strategies or to broaden macro coverage;
     # decrease to reduce token usage in agent prompts.
@@ -102,6 +169,12 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
+    # get_global_news query merge: macro_plus_ticker | macro_only | ticker_only
+    "global_news_mode": "macro_plus_ticker",
+    # Per-run industry queries (filled in propagate for CN tickers).
+    "ticker_news_queries": [],
+    # Set per propagate(); used by a_share news fetchers (no Yahoo).
+    "company_of_interest": None,
     # Benchmark for alpha calculation in the reflection layer.
     # ``benchmark_ticker`` (when set) overrides the suffix map for all
     # tickers; leave it None to use ``benchmark_map`` for auto-detection
@@ -119,4 +192,4 @@ DEFAULT_CONFIG = _apply_env_overrides({
         ".AX":  "^AXJO",    # Australia (ASX 200)
         "":     "SPY",      # default for US-listed tickers (no suffix)
     },
-})
+}))
