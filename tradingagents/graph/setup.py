@@ -7,6 +7,8 @@ from langgraph.prebuilt import ToolNode
 from tradingagents.agents import *
 from tradingagents.agents.utils.agent_states import AgentState
 
+from tradingagents.agents.utils.analyst_threads import create_thread_tool_node
+
 from .analyst_execution import build_analyst_execution_plan
 from .analyst_join import ANALYST_JOIN_NODE, analysts_join_node
 from .conditional_logic import ConditionalLogic
@@ -46,12 +48,23 @@ class GraphSetup:
             selected_analysts,
             concurrency_limit=self.analyst_concurrency_limit,
         )
+        self.conditional_logic.analyst_report_keys = [
+            spec.report_key for spec in plan.specs
+        ]
 
         analyst_factories = {
-            "market": lambda: create_market_analyst(self.quick_thinking_llm),
-            "social": lambda: create_sentiment_analyst(self.quick_thinking_llm),
-            "news": lambda: create_news_analyst(self.quick_thinking_llm),
-            "fundamentals": lambda: create_fundamentals_analyst(self.quick_thinking_llm),
+            "market": lambda tk=None: create_market_analyst(
+                self.quick_thinking_llm, analyst_thread_key=tk
+            ),
+            "social": lambda tk=None: create_sentiment_analyst(
+                self.quick_thinking_llm, analyst_thread_key=tk
+            ),
+            "news": lambda tk=None: create_news_analyst(
+                self.quick_thinking_llm, analyst_thread_key=tk
+            ),
+            "fundamentals": lambda tk=None: create_fundamentals_analyst(
+                self.quick_thinking_llm, analyst_thread_key=tk
+            ),
         }
 
         # Create researcher and manager nodes
@@ -69,11 +82,19 @@ class GraphSetup:
         # Create workflow
         workflow = StateGraph(AgentState)
 
+        parallel_analysts = (
+            self.analyst_concurrency_limit > 1 and len(plan.specs) > 1
+        )
+
         # Add analyst nodes to the graph
         for spec in plan.specs:
-            workflow.add_node(spec.agent_node, analyst_factories[spec.key]())
-            workflow.add_node(spec.clear_node, create_msg_delete())
-            workflow.add_node(spec.tool_node, self.tool_nodes[spec.key])
+            thread_key = spec.key if parallel_analysts else None
+            workflow.add_node(spec.agent_node, analyst_factories[spec.key](thread_key))
+            workflow.add_node(spec.clear_node, create_msg_delete(thread_key))
+            tool_node = self.tool_nodes[spec.key]
+            if parallel_analysts:
+                tool_node = create_thread_tool_node(tool_node, spec.key)
+            workflow.add_node(spec.tool_node, tool_node)
 
         # Add other nodes
         workflow.add_node("Bull Researcher", bull_researcher_node)
@@ -84,10 +105,6 @@ class GraphSetup:
         workflow.add_node("Neutral Analyst", neutral_analyst)
         workflow.add_node("Conservative Analyst", conservative_analyst)
         workflow.add_node("Portfolio Manager", portfolio_manager_node)
-
-        parallel_analysts = (
-            self.analyst_concurrency_limit > 1 and len(plan.specs) > 1
-        )
 
         if parallel_analysts:
             workflow.add_node(ANALYST_JOIN_NODE, analysts_join_node)
@@ -118,7 +135,14 @@ class GraphSetup:
                 workflow.add_edge(current_clear, "Bull Researcher")
 
         if parallel_analysts:
-            workflow.add_edge(ANALYST_JOIN_NODE, "Bull Researcher")
+            workflow.add_conditional_edges(
+                ANALYST_JOIN_NODE,
+                self.conditional_logic.should_continue_after_analyst_join,
+                {
+                    "continue": "Bull Researcher",
+                    "wait": ANALYST_JOIN_NODE,
+                },
+            )
 
         # Add remaining edges
         workflow.add_conditional_edges(

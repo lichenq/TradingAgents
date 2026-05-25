@@ -21,6 +21,10 @@ from tradingagents.dataflows.cn_sentiment import (
 )
 from tradingagents.dataflows.reddit import fetch_reddit_posts
 from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+from tradingagents.agents.utils.analyst_threads import (
+    analyst_invoke_messages,
+    analyst_node_return,
+)
 from tradingagents.market import effective_market_profile
 
 
@@ -28,7 +32,7 @@ def _seven_days_back(trade_date: str) -> str:
     return (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
 
 
-def create_sentiment_analyst(llm):
+def create_sentiment_analyst(llm, *, analyst_thread_key: str | None = None):
     """Create a sentiment analyst node for the trading graph."""
 
     def sentiment_analyst_node(state):
@@ -88,12 +92,15 @@ def create_sentiment_analyst(llm):
         prompt = prompt.partial(instrument_context=instrument_context)
 
         chain = prompt | llm
-        result = chain.invoke(state["messages"])
+        result = chain.invoke(analyst_invoke_messages(state, analyst_thread_key))
 
-        return {
-            "messages": [result],
-            "sentiment_report": result.content,
-        }
+        return analyst_node_return(
+            state,
+            thread_key=analyst_thread_key,
+            message=result,
+            report_key="sentiment_report",
+            report=result.content,
+        )
 
     return sentiment_analyst_node
 

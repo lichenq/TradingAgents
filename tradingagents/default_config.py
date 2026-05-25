@@ -1,6 +1,51 @@
 import os
 
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
+_LOCAL_TRADINGAGENTS_HOME = os.path.join(os.getcwd(), ".tradingagents")
+
+
+def _storage_dir_writable(path: str) -> bool:
+    """True when the directory exists and we can create/append a probe file."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        probe = os.path.join(path, ".write_probe")
+        with open(probe, "a", encoding="utf-8"):
+            pass
+        os.remove(probe)
+        return True
+    except OSError:
+        return False
+
+
+def _default_storage_dir(subdir: str, *, env_var: str | None = None) -> str:
+    """Pick a writable storage directory (home dir, or project-local fallback)."""
+    explicit = os.environ.get(env_var) if env_var else None
+    if explicit:
+        path = os.path.abspath(os.path.expanduser(explicit))
+        if _storage_dir_writable(path):
+            return path
+        fallback = os.path.abspath(os.path.join(_LOCAL_TRADINGAGENTS_HOME, subdir))
+        if _storage_dir_writable(fallback):
+            return fallback
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+    home_path = os.path.join(_TRADINGAGENTS_HOME, subdir)
+    if _storage_dir_writable(home_path):
+        return home_path
+    fallback = os.path.abspath(os.path.join(_LOCAL_TRADINGAGENTS_HOME, subdir))
+    if _storage_dir_writable(fallback):
+        return fallback
+    os.makedirs(fallback, exist_ok=True)
+    return fallback
+
+
+def _default_memory_log_path() -> str:
+    explicit = os.environ.get("TRADINGAGENTS_MEMORY_LOG_PATH")
+    if explicit:
+        return os.path.abspath(os.path.expanduser(explicit))
+    memory_dir = _default_storage_dir("memory")
+    return os.path.join(memory_dir, "trading_memory.md")
 
 # Single source of truth for env-var → config-key overrides. To expose
 # a new config key for environment-based override, add a row here — no
@@ -21,6 +66,9 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_GLOBAL_NEWS_MODE":     "global_news_mode",
     "TRADINGAGENTS_PROGRESS_LOG":        "progress_logging",
     "TRADINGAGENTS_ANALYST_CONCURRENCY": "analyst_concurrency_limit",
+    "TRADINGAGENTS_RESULTS_DIR":         "results_dir",
+    "TRADINGAGENTS_CACHE_DIR":           "data_cache_dir",
+    "TRADINGAGENTS_MEMORY_LOG_PATH":     "memory_log_path",
 }
 
 
@@ -105,9 +153,9 @@ def apply_market_profile(config: dict) -> dict:
 
 DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
-    "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
-    "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
-    "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md")),
+    "results_dir": _default_storage_dir("logs", env_var="TRADINGAGENTS_RESULTS_DIR"),
+    "data_cache_dir": _default_storage_dir("cache", env_var="TRADINGAGENTS_CACHE_DIR"),
+    "memory_log_path": _default_memory_log_path(),
     # Optional cap on the number of resolved memory log entries. When set,
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
@@ -139,7 +187,8 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
     # >1 runs market/sentiment/news/fundamentals in parallel (LangGraph fan-out).
-    "analyst_concurrency_limit": 4,
+    # Use 1 until parallel join/debate reducers are fully battle-tested.
+    "analyst_concurrency_limit": 1,
     # Print stage-by-stage progress to stderr during propagate (off: TRADINGAGENTS_PROGRESS_LOG=0)
     "progress_logging": True,
     # News / data fetching parameters

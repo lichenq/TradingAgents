@@ -6,7 +6,9 @@ import sys
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, TextIO, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Optional, TextIO, Tuple
+
+ActivityKind = Literal["llm", "data"]
 
 # LangGraph node name → display label (Chinese; matches CLI agent names where possible)
 NODE_LABELS: Dict[str, str] = {
@@ -31,6 +33,16 @@ NODE_LABELS: Dict[str, str] = {
     "Conservative Analyst": "保守风控",
     "Portfolio Manager": "投资组合经理",
     "Analyst Team Join": "分析师汇合",
+}
+
+# Nodes that invoke data vendors / subprocesses (not LLM inference).
+_DATA_TOOL_NODES = frozenset(
+    name for name in NODE_LABELS if name.startswith("tools_")
+)
+
+_STALL_HINTS: Dict[ActivityKind, str] = {
+    "llm": "等待 LLM 响应",
+    "data": "正在拉取 A 股数据",
 }
 
 REPORT_LABELS: Dict[str, str] = {
@@ -65,18 +77,21 @@ def label_node(node_name: str) -> str:
     return NODE_LABELS.get(node_name, node_name)
 
 
-def extract_tool_names(update: Dict[str, Any]) -> List[str]:
-    names: List[str] = []
-    for message in update.get("messages") or []:
-        tool_calls = getattr(message, "tool_calls", None) or []
-        for tc in tool_calls:
-            if isinstance(tc, dict):
-                name = tc.get("name")
-            else:
-                name = getattr(tc, "name", None)
-            if name and name not in names:
-                names.append(str(name))
-    return names
+def classify_activity(
+    node_name: str, update: Optional[Dict[str, Any]] = None
+) -> ActivityKind:
+    """Classify stall reason: LLM inference vs data fetch / tool execution."""
+    if node_name in _DATA_TOOL_NODES or node_name.startswith("tools_"):
+        return "data"
+    if extract_tool_names(update):
+        return "data"
+    return "llm"
+
+
+def extract_tool_names(update: Optional[Dict[str, Any]]) -> List[str]:
+    from tradingagents.agents.utils.analyst_threads import tool_names_from_update
+
+    return tool_names_from_update(update)
 
 
 class GraphProgressLogger:
@@ -99,6 +114,7 @@ class GraphProgressLogger:
         self._t0 = time.monotonic()
         self._last_event = self._t0
         self._current_phase = "初始化"
+        self._activity_kind: ActivityKind = "llm"
         self._completed_reports: set[str] = set()
         self._prev_values: Dict[str, Any] = {}
         self._stop = threading.Event()
@@ -113,6 +129,13 @@ class GraphProgressLogger:
 
     def _gap(self) -> float:
         return time.monotonic() - self._last_event
+
+    def set_activity_kind(self, kind: ActivityKind) -> None:
+        if kind in _STALL_HINTS:
+            self._activity_kind = kind
+
+    def _stall_hint(self) -> str:
+        return _STALL_HINTS[self._activity_kind]
 
     def _log(self, msg: str) -> None:
         gap = self._gap()
@@ -129,7 +152,7 @@ class GraphProgressLogger:
                 if idle >= self.heartbeat_sec:
                     self._log(
                         f"⏳ 仍在运行: {self._current_phase} "
-                        f"(已 {idle:.0f}s 无新步骤；LLM 或 A 股数据接口可能较慢，并未卡死)"
+                        f"(已 {idle:.0f}s 无新步骤；{self._stall_hint()}，并未卡死)"
                     )
 
         self._heartbeat_thread = threading.Thread(
@@ -148,9 +171,12 @@ class GraphProgressLogger:
             for line in extra_lines:
                 self._log(f"  · {line}")
 
-    def _on_node_update(self, node_name: str, update: Dict[str, Any]) -> None:
+    def _on_node_update(self, node_name: str, update: Optional[Dict[str, Any]]) -> None:
+        if not update:
+            return
         label = label_node(node_name)
         self._current_phase = label
+        self._activity_kind = classify_activity(node_name, update)
         tools = extract_tool_names(update)
         if tools:
             self._log(f"▶ {label} · 调用工具: {', '.join(tools)}")
@@ -173,6 +199,7 @@ class GraphProgressLogger:
             prev_count = prev_inv.get("count", 0) if isinstance(prev_inv, dict) else 0
             if count > prev_count:
                 self._current_phase = "多空辩论"
+                self._activity_kind = "llm"
                 self._log(f"▶ 投资辩论 · 第 {count} 轮")
 
         risk = state.get("risk_debate_state") or {}
@@ -182,6 +209,7 @@ class GraphProgressLogger:
             prev_count = prev_risk.get("count", 0) if isinstance(prev_risk, dict) else 0
             if count > prev_count:
                 self._current_phase = "风控辩论"
+                self._activity_kind = "llm"
                 self._log(f"▶ 风控辩论 · 第 {count} 轮")
 
         self._prev_values = {
@@ -209,7 +237,11 @@ class GraphProgressLogger:
         try:
             for mode, chunk in graph.stream(init_state, **stream_args):
                 if mode == "updates":
+                    if not chunk:
+                        continue
                     for node_name, update in chunk.items():
+                        if update is None:
+                            continue
                         self._on_node_update(node_name, update)
                 else:
                     final_state = chunk

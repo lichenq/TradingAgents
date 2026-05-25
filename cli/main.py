@@ -515,16 +515,18 @@ def get_user_selections():
         f"[green]Detected asset type:[/green] {asset_type.value}"
     )
 
-    # Step 2: Analysis date
-    default_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    # Step 2: Analysis date (today if trading day, else previous session)
+    from tradingagents.dataflows.trade_date import resolve_default_trade_date
+
+    default_date = resolve_default_trade_date(selected_ticker, DEFAULT_CONFIG.copy())
     console.print(
         create_question_box(
             "Step 2: Analysis Date",
-            "Enter the analysis date (YYYY-MM-DD)",
+            "Enter the analysis date (YYYY-MM-DD). Default: today, or last trading day if closed.",
             default_date,
         )
     )
-    analysis_date = get_analysis_date()
+    analysis_date = get_analysis_date(default=default_date)
 
     # Step 3: Output language
     console.print(
@@ -662,11 +664,14 @@ def get_ticker():
     return (ticker.strip() or "SPY").upper()
 
 
-def get_analysis_date():
-    """Get the analysis date from user input."""
+def get_analysis_date_cli(ticker: str = ""):
+    """Get the analysis date from user input (typer prompt)."""
+    from tradingagents.dataflows.trade_date import resolve_default_trade_date
+
+    default_date = resolve_default_trade_date(ticker, DEFAULT_CONFIG.copy())
     while True:
         date_str = typer.prompt(
-            "", default=datetime.datetime.now().strftime("%Y-%m-%d")
+            "", default=default_date
         )
         try:
             # Validate date format and ensure it's not in the future

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from tradingagents.dataflows.cn_market_dates import cn_ohlcv_end_date
 from tradingagents.market import cn_uses_a_share_skill, normalize_a_share_code
 
 logger = logging.getLogger(__name__)
@@ -41,8 +42,9 @@ def run_cn_prefetch(
     max_workers = int(max_workers)
     clear_prefetch_cache()
     code6 = normalize_a_share_code(ticker)
-    end = str(trade_date)
-    start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=120)).strftime("%Y-%m-%d")
+    trade_date = str(trade_date)
+    end = cn_ohlcv_end_date(trade_date)
+    start = (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=120)).strftime("%Y-%m-%d")
     news_start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
 
     def task_sector() -> Tuple[str, str]:
@@ -77,9 +79,9 @@ def run_cn_prefetch(
         return "events", "ok" if block else "empty"
 
     def task_kline() -> Tuple[str, str]:
-        from tradingagents.dataflows.interface import route_to_vendor
+        from tradingagents.dataflows.a_share import _build_a_share_ohlcv_block
 
-        block = route_to_vendor("get_stock_data", ticker, start, end)
+        block = _build_a_share_ohlcv_block(ticker, start, trade_date, use_cache=False)
         _cache(f"kline:{code6}", block)
         return "kline", "ok" if block else "empty"
 

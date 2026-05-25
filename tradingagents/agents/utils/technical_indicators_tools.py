@@ -15,7 +15,8 @@ def get_indicators(
     Args:
         symbol (str): Ticker symbol of the company, e.g. AAPL, TSM
         indicator (str): A single technical indicator name, e.g. 'rsi', 'macd'. Call this tool once per indicator.
-        curr_date (str): The current trading date you are trading on, YYYY-mm-dd
+        curr_date (str): Analysis trade_date (YYYY-mm-dd). For A-shares, vendors
+            include data through the latest session as of the run and a realtime quote.
         look_back_days (int): How many days to look back, default is 30
     Returns:
         str: A formatted dataframe containing the technical indicators for the specified ticker symbol and indicator.

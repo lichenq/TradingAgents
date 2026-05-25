@@ -2,6 +2,7 @@
 
 from typing import List, Optional
 from pathlib import Path
+import os
 import re
 
 from tradingagents.agents.utils.rating import parse_rating
@@ -21,10 +22,51 @@ class TradingMemoryLog:
         self._log_path = None
         path = cfg.get("memory_log_path")
         if path:
-            self._log_path = Path(path).expanduser()
-            self._log_path.parent.mkdir(parents=True, exist_ok=True)
+            self._log_path = self._resolve_writable_log_path(Path(path).expanduser())
         # Optional cap on resolved entries. None disables rotation.
         self._max_entries = cfg.get("memory_log_max_entries")
+
+    @staticmethod
+    def _local_fallback_log_path() -> Path:
+        return Path.cwd() / ".tradingagents" / "memory" / "trading_memory.md"
+
+    @staticmethod
+    def _path_writable_for_append(path: Path) -> bool:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8"):
+                pass
+            return True
+        except OSError:
+            return False
+
+    @classmethod
+    def _resolve_writable_log_path(cls, path: Path) -> Path:
+        home_default = (
+            Path(os.path.expanduser("~")) / ".tradingagents" / "memory" / "trading_memory.md"
+        )
+        candidates = [path, cls._local_fallback_log_path()]
+        if path.resolve() != home_default.resolve():
+            candidates.append(home_default)
+        seen: set[str] = set()
+        for candidate in candidates:
+            key = str(candidate.resolve())
+            if key in seen:
+                continue
+            seen.add(key)
+            if cls._path_writable_for_append(candidate):
+                return candidate
+        fallback = cls._local_fallback_log_path()
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+    def _rebind_log_path_if_needed(self) -> Optional[Path]:
+        if not self._log_path:
+            return None
+        if self._path_writable_for_append(self._log_path):
+            return self._log_path
+        self._log_path = self._resolve_writable_log_path(self._log_path)
+        return self._log_path
 
     # --- Write path (Phase A) ---
 
@@ -35,18 +77,19 @@ class TradingMemoryLog:
         final_trade_decision: str,
     ) -> None:
         """Append pending entry at end of propagate(). No LLM call."""
-        if not self._log_path:
+        log_path = self._rebind_log_path_if_needed()
+        if not log_path:
             return
         # Idempotency guard: fast raw-text scan instead of full parse
-        if self._log_path.exists():
-            raw = self._log_path.read_text(encoding="utf-8")
+        if log_path.exists():
+            raw = log_path.read_text(encoding="utf-8")
             for line in raw.splitlines():
                 if line.startswith(f"[{trade_date} | {ticker} |") and line.endswith("| pending]"):
                     return
         rating = parse_rating(final_trade_decision)
         tag = f"[{trade_date} | {ticker} | {rating} | pending]"
         entry = f"{tag}\n\nDECISION:\n{final_trade_decision}{self._SEPARATOR}"
-        with open(self._log_path, "a", encoding="utf-8") as f:
+        with open(log_path, "a", encoding="utf-8") as f:
             f.write(entry)
 
     # --- Read path (Phase A) ---

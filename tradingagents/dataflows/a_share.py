@@ -9,6 +9,7 @@ from typing import Annotated, Any, Dict, List
 from dateutil.relativedelta import relativedelta
 
 from tradingagents.dataflows.a_share_runner import run_script
+from tradingagents.dataflows.cn_market_dates import cn_indicator_end_date, cn_ohlcv_end_date
 from tradingagents.dataflows.cn_sentiment import fetch_cn_news_block
 from tradingagents.market import normalize_a_share_code
 
@@ -44,6 +45,127 @@ _INDICATOR_HINTS = {
     "boll_lb": "BOLL 下轨",
 }
 
+def _fetch_a_share_realtime_quote(code6: str) -> Dict[str, Any] | None:
+    ok, raw, data = run_script(
+        "fetch_realtime.py",
+        ["--quote", code6, "--json"],
+        timeout=25,
+    )
+    if ok and isinstance(data, dict):
+        return data
+    return None
+
+
+def _last_bar_date_from_ohlcv(body: str) -> str:
+    last = ""
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.lower().startswith("time,"):
+            continue
+        last = str(line.split(",")[0])[:10]
+    return last
+
+
+def _cn_market_asof_header(
+    trade_date: str,
+    *,
+    code6: str,
+    symbol: str,
+    ohlcv_end: str,
+    last_bar: str,
+    quote: Dict[str, Any] | None,
+) -> str:
+    lines = [
+        f"# Analysis trade_date: {trade_date}",
+        f"# OHLCV requested through: {ohlcv_end}",
+        f"# Last daily bar in CSV: {last_bar or 'unknown'}",
+        f"# Data retrieved at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    ]
+    if quote:
+        q_date = quote.get("日期") or quote.get("date") or ""
+        price = quote.get("最新价") or quote.get("price")
+        lines.append(f"# Realtime quote date: {q_date}")
+        lines.append(f"# Realtime price (分析时最新价): {price}")
+        lines.append(f"# Realtime updated: {quote.get('更新时间', '')}")
+        lines.append(f"# Market status: {quote.get('市场状态', '')}")
+        note = quote.get("备注")
+        if note:
+            lines.append(f"# Quote note: {note}")
+        lines.append(
+            "# Use the realtime price above for 当前价/最新收盘价 when it is newer than the last daily bar."
+        )
+    elif last_bar and last_bar < ohlcv_end:
+        lines.append(
+            f"# Note: last daily bar ({last_bar}) is before request end ({ohlcv_end}); "
+            "intraday close may differ until the session is recorded in daily history."
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _build_a_share_ohlcv_block(
+    symbol: str,
+    start_date: str,
+    trade_date: str,
+    *,
+    use_cache: bool = True,
+) -> str:
+    code6 = normalize_a_share_code(symbol)
+    ohlcv_end = cn_ohlcv_end_date(trade_date)
+
+    if use_cache:
+        from tradingagents.dataflows.cn_prefetch import get_prefetched
+
+        cached = get_prefetched(f"kline:{code6}")
+        if cached:
+            return cached
+
+    ok, raw, rows = run_script(
+        "fetch_history.py",
+        [
+            "--kline", code6,
+            "--start", start_date,
+            "--end", ohlcv_end,
+            "--freq", "1d",
+            "--count", "500",
+            "--json",
+        ],
+        timeout=40,
+    )
+    if not ok:
+        return raw
+    if not isinstance(rows, list) or not rows:
+        return f"No A-share OHLCV for {code6} between {start_date} and {ohlcv_end}"
+
+    lines = ["time,open,high,low,close,volume,pctChg"]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        lines.append(
+            f"{row.get('time','')},{row.get('open','')},{row.get('high','')},"
+            f"{row.get('low','')},{row.get('close','')},{row.get('volume','')},"
+            f"{row.get('pctChg','')}"
+        )
+    csv_body = "\n".join(lines)
+    last_bar = _last_bar_date_from_ohlcv(csv_body)
+    quote = _fetch_a_share_realtime_quote(code6)
+    header = _cn_market_asof_header(
+        trade_date,
+        code6=code6,
+        symbol=symbol,
+        ohlcv_end=ohlcv_end,
+        last_bar=last_bar,
+        quote=quote,
+    )
+    return (
+        header
+        + f"# A-share OHLCV for {code6} ({symbol}) from {start_date} to {ohlcv_end}\n"
+        + f"# Total records: {len(lines) - 1}\n"
+        + "# Data source: a-share-data (Tencent/Sina/Eastmoney)\n\n"
+        + csv_body
+    )
+
+
 _TECH_MAP = {
     "close_50_sma": "MA",
     "close_200_sma": "MA",
@@ -65,47 +187,8 @@ def get_a_share_stock_data(
 ) -> str:
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
-    code6 = normalize_a_share_code(symbol)
-    from tradingagents.dataflows.cn_prefetch import get_prefetched
-
-    cached = get_prefetched(f"kline:{code6}")
-    if cached:
-        return cached
-
-    ok, raw, rows = run_script(
-        "fetch_history.py",
-        [
-            "--kline", code6,
-            "--start", start_date,
-            "--end", end_date,
-            "--freq", "1d",
-            "--count", "500",
-            "--json",
-        ],
-        timeout=40,
-    )
-    if not ok:
-        return raw
-    if not isinstance(rows, list) or not rows:
-        return f"No A-share OHLCV for {code6} between {start_date} and {end_date}"
-
-    lines = ["time,open,high,low,close,volume,pctChg"]
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        lines.append(
-            f"{row.get('time','')},{row.get('open','')},{row.get('high','')},"
-            f"{row.get('low','')},{row.get('close','')},{row.get('volume','')},"
-            f"{row.get('pctChg','')}"
-        )
-
-    header = (
-        f"# A-share OHLCV for {code6} ({symbol}) from {start_date} to {end_date}\n"
-        f"# Total records: {len(lines) - 1}\n"
-        f"# Data source: a-share-data (Tencent/Sina/Eastmoney)\n"
-        f"# Retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-    )
-    return header + "\n".join(lines)
+    # ``end_date`` from the LLM may lag; always anchor freshness on ``end_date`` as trade_date.
+    return _build_a_share_ohlcv_block(symbol, start_date, end_date, use_cache=True)
 
 
 def get_a_share_indicators(
@@ -128,8 +211,9 @@ def get_a_share_indicators(
     if not isinstance(rows, list) or not rows:
         return f"No indicator data for {code6} on {curr_date}"
 
-    curr_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-    before = curr_dt - relativedelta(days=look_back_days)
+    end_date = cn_indicator_end_date(curr_date)
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    before = end_dt - relativedelta(days=look_back_days)
 
     ind_string = ""
     for row in reversed(rows):
@@ -142,14 +226,16 @@ def get_a_share_indicators(
             row_dt = datetime.strptime(str(t)[:10], "%Y-%m-%d")
         except ValueError:
             continue
-        if row_dt < before or row_dt > curr_dt:
+        if row_dt < before or row_dt > end_dt:
             continue
         val = _pick_indicator_value(row, indicator)
         ind_string += f"{str(t)[:10]}: {val}\n"
 
     hint = _INDICATOR_HINTS.get(indicator, indicator)
     return (
-        f"## {indicator} ({hint}) for {code6} from {before.strftime('%Y-%m-%d')} to {curr_date}:\n\n"
+        f"## {indicator} ({hint}) for {code6}\n"
+        f"## Analysis trade_date: {curr_date} · data through: {end_date}\n"
+        f"## Range: {before.strftime('%Y-%m-%d')} to {end_date}\n\n"
         f"{ind_string or 'N/A: no rows in range'}\n"
     )
 

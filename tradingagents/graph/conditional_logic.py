@@ -1,23 +1,41 @@
 # TradingAgents/graph/conditional_logic.py
 
 from tradingagents.agents.utils.agent_states import AgentState
+from tradingagents.agents.utils.analyst_threads import last_message_in_thread
 
 
 class ConditionalLogic:
     """Handles conditional logic for determining graph flow."""
 
-    def __init__(self, max_debate_rounds=1, max_risk_discuss_rounds=1):
+    def __init__(
+        self,
+        max_debate_rounds=1,
+        max_risk_discuss_rounds=1,
+        analyst_report_keys=None,
+    ):
         """Initialize with configuration parameters."""
         self.max_debate_rounds = max_debate_rounds
         self.max_risk_discuss_rounds = max_risk_discuss_rounds
+        self.analyst_report_keys = list(analyst_report_keys or [])
+
+    def _should_continue_analyst(self, state: AgentState, thread_key: str, tools_node: str, clear_node: str) -> str:
+        last_message = last_message_in_thread(state, thread_key)
+        if getattr(last_message, "tool_calls", None):
+            return tools_node
+        return clear_node
+
+    def should_continue_after_analyst_join(self, state: AgentState) -> str:
+        """Wait at the join barrier until every selected analyst report exists."""
+        for key in self.analyst_report_keys:
+            if not (state.get(key) or "").strip():
+                return "wait"
+        return "continue"
 
     def should_continue_market(self, state: AgentState):
         """Determine if market analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
-            return "tools_market"
-        return "Msg Clear Market"
+        return self._should_continue_analyst(
+            state, "market", "tools_market", "Msg Clear Market"
+        )
 
     def should_continue_social(self, state: AgentState):
         """Determine if sentiment-analyst tool round should continue.
@@ -27,27 +45,21 @@ class ConditionalLogic:
         back-compat); the returned ``clear_node`` label uses the v0.2.5
         rename so it matches the node registered by the execution plan.
         """
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
-            return "tools_social"
-        return "Msg Clear Sentiment"
+        return self._should_continue_analyst(
+            state, "social", "tools_social", "Msg Clear Sentiment"
+        )
 
     def should_continue_news(self, state: AgentState):
         """Determine if news analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
-            return "tools_news"
-        return "Msg Clear News"
+        return self._should_continue_analyst(
+            state, "news", "tools_news", "Msg Clear News"
+        )
 
     def should_continue_fundamentals(self, state: AgentState):
         """Determine if fundamentals analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
-            return "tools_fundamentals"
-        return "Msg Clear Fundamentals"
+        return self._should_continue_analyst(
+            state, "fundamentals", "tools_fundamentals", "Msg Clear Fundamentals"
+        )
 
     def should_continue_debate(self, state: AgentState) -> str:
         """Determine if debate should continue."""

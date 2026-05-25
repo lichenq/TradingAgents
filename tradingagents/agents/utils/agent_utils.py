@@ -38,33 +38,34 @@ def get_language_instruction() -> str:
 
 def build_instrument_context(ticker: str, asset_type: str = "stock") -> str:
     """Describe the exact instrument so agents preserve exchange-qualified tickers."""
+    from tradingagents.dataflows.config import get_config
+    from tradingagents.market import cn_uses_a_share_skill
+
     instrument_label = "asset" if asset_type == "crypto" else "instrument"
     extra_hint = (
         " Treat it as a crypto asset rather than a company, and do not assume company fundamentals are available."
         if asset_type == "crypto"
         else ""
     )
+    cn_hint = ""
+    if asset_type != "crypto" and cn_uses_a_share_skill(ticker, get_config()):
+        cn_hint = (
+            " A-share market data includes a realtime quote line (分析时最新价) when available; "
+            "use it for 当前价/最新收盘价 instead of labeling the previous daily bar as today. "
+            "Pass the analysis trade_date as end_date in get_stock_data / curr_date in get_indicators."
+        )
     return (
         f"The {instrument_label} to analyze is `{ticker}`. "
         "Use this exact ticker in every tool call, report, and recommendation, "
         "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`, `-USD`)."
         + extra_hint
+        + cn_hint
     )
 
-def create_msg_delete():
-    def delete_messages(state):
-        """Clear messages and add placeholder for Anthropic compatibility"""
-        messages = state["messages"]
+def create_msg_delete(thread_key: str | None = None):
+    from tradingagents.agents.utils.analyst_threads import create_analyst_msg_clear
 
-        # Remove all messages
-        removal_operations = [RemoveMessage(id=m.id) for m in messages]
-
-        # Add a minimal placeholder message
-        placeholder = HumanMessage(content="Continue")
-
-        return {"messages": removal_operations + [placeholder]}
-
-    return delete_messages
+    return create_analyst_msg_clear(thread_key)
 
 
         

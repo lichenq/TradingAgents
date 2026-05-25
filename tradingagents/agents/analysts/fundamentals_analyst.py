@@ -9,6 +9,10 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
 )
 from tradingagents.dataflows.config import get_config
+from tradingagents.agents.utils.analyst_threads import (
+    analyst_invoke_messages,
+    analyst_node_return,
+)
 from tradingagents.market import cn_uses_a_share_skill
 
 
@@ -42,7 +46,7 @@ def _prefetch_cn_fundamentals(ticker: str, trade_date: str) -> str:
     return block
 
 
-def create_fundamentals_analyst(llm):
+def create_fundamentals_analyst(llm, *, analyst_thread_key: str | None = None):
     def fundamentals_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
@@ -105,16 +109,19 @@ def create_fundamentals_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        result = chain.invoke(analyst_invoke_messages(state, analyst_thread_key))
 
         report = ""
 
         if len(result.tool_calls) == 0:
             report = result.content
 
-        return {
-            "messages": [result],
-            "fundamentals_report": report,
-        }
+        return analyst_node_return(
+            state,
+            thread_key=analyst_thread_key,
+            message=result,
+            report_key="fundamentals_report",
+            report=report,
+        )
 
     return fundamentals_analyst_node

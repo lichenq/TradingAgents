@@ -68,10 +68,13 @@ def filter_analysts_for_asset_type(
     ]
 
 
-def get_analysis_date() -> str:
+def get_analysis_date(default: str | None = None) -> str:
     """Prompt the user to enter a date in YYYY-MM-DD format."""
     import re
     from datetime import datetime
+
+    if default is None:
+        default = datetime.now().strftime("%Y-%m-%d")
 
     def validate_date(date_str: str) -> bool:
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
@@ -84,6 +87,7 @@ def get_analysis_date() -> str:
 
     date = questionary.text(
         "Enter the analysis date (YYYY-MM-DD):",
+        default=default,
         validate=lambda x: validate_date(x.strip())
         or "Please enter a valid date in YYYY-MM-DD format.",
         style=questionary.Style(

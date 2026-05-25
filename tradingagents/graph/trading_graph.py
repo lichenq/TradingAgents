@@ -307,7 +307,7 @@ class TradingAgentsGraph:
         if updates:
             self.memory_log.batch_update_with_outcomes(updates)
 
-    def propagate(self, company_name, trade_date, asset_type: str = "stock"):
+    def propagate(self, company_name, trade_date=None, asset_type: str = "stock"):
         """Run the trading agents graph for a company on a specific date.
 
         ``asset_type`` selects between the stock pipeline (default) and the
@@ -316,7 +316,16 @@ class TradingAgentsGraph:
         ``checkpoint_enabled`` is set in config, the graph is recompiled with
         a per-ticker SqliteSaver so a crashed run can resume from the last
         successful node on a subsequent invocation with the same ticker+date.
+
+        When ``trade_date`` is omitted, uses today if it is a trading session
+        for the ticker's market, otherwise the previous trading day.
         """
+        if not trade_date:
+            from tradingagents.dataflows.trade_date import resolve_default_trade_date
+
+            trade_date = resolve_default_trade_date(company_name, self.config)
+            logger.info("Resolved default trade_date=%s for %s", trade_date, company_name)
+
         self.ticker = company_name
 
         # Resolve any pending memory-log entries for this ticker before the pipeline runs.
@@ -387,8 +396,15 @@ class TradingAgentsGraph:
 
         # Initialize state — inject memory log context for PM.
         past_context = self.memory_log.get_past_context(company_name)
+        parallel_analysts = (
+            int(self.config.get("analyst_concurrency_limit", 1)) > 1
+        )
         init_agent_state = self.propagator.create_initial_state(
-            company_name, trade_date, asset_type=asset_type, past_context=past_context
+            company_name,
+            trade_date,
+            asset_type=asset_type,
+            past_context=past_context,
+            parallel_analysts=parallel_analysts,
         )
         args = self.propagator.get_graph_args()
 

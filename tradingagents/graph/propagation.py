@@ -21,9 +21,10 @@ class Propagator:
         trade_date: str,
         asset_type: str = "stock",
         past_context: str = "",
+        parallel_analysts: bool = False,
     ) -> Dict[str, Any]:
         """Create the initial state for the agent graph."""
-        return {
+        state: Dict[str, Any] = {
             "messages": [("human", company_name)],
             "company_of_interest": company_name,
             "asset_type": asset_type,
@@ -58,6 +59,9 @@ class Propagator:
             "sentiment_report": "",
             "news_report": "",
         }
+        if parallel_analysts:
+            state["analyst_threads"] = {}
+        return state
 
     def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:
         """Get arguments for the graph invocation.
