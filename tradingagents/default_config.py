@@ -72,6 +72,12 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_POSITION_CONTEXT":    "position_context",
 }
 
+# Optional numeric overrides (defaults are None in DEFAULT_CONFIG).
+_OPTIONAL_ENV_NUMERIC = {
+    "TRADINGAGENTS_POSITION_COST": ("position_cost", float),
+    "TRADINGAGENTS_POSITION_SHARES": ("position_shares", int),
+}
+
 
 def _coerce(value: str, reference):
     """Coerce env-var string to the type of the existing default value."""
@@ -86,6 +92,11 @@ def _coerce(value: str, reference):
 
 def _apply_env_overrides(config: dict) -> dict:
     """Apply TRADINGAGENTS_* env vars to the config dict in-place."""
+    for env_var, (key, cast) in _OPTIONAL_ENV_NUMERIC.items():
+        raw = os.environ.get(env_var)
+        if raw is None or raw == "":
+            continue
+        config[key] = cast(raw)
     for env_var, key in _ENV_OVERRIDES.items():
         raw = os.environ.get(env_var)
         if raw is None or raw == "":
@@ -189,6 +200,9 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "output_language": "English",
     # Decision framing: "empty" (flat, no position — default) or "held" (already own the ticker)
     "position_context": "empty",
+    # User holdings (optional; injected into verified_market_facts when set)
+    "position_cost": None,
+    "position_shares": None,
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,

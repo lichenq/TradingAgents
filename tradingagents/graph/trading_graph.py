@@ -398,6 +398,23 @@ class TradingAgentsGraph:
                 + progress_extra
             )
 
+        from tradingagents.agents.utils.position_holdings import (
+            enrich_verified_with_position_holdings,
+            get_holdings_from_config,
+        )
+
+        cost, shares = get_holdings_from_config(self.config)
+        if cost is not None or shares is not None:
+            verified_market_facts = enrich_verified_with_position_holdings(
+                verified_market_facts, self.config
+            )
+            parts = []
+            if cost is not None:
+                parts.append(f"成本 {cost:g}")
+            if shares is not None:
+                parts.append(f"{shares} 股")
+            progress_extra.append(f"持仓注入: {', '.join(parts)}")
+
         # Initialize state — inject memory log context for PM.
         past_context = self.memory_log.get_past_context(company_name)
         parallel_analysts = (
