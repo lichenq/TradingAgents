@@ -1,0 +1,31 @@
+{
+  "trade_date": "2026-05-26",
+  "strategy": "trend_pullback",
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 1,
+    "min_volume_amount": 50000000.0
+  },
+  "all_screened_count": 24,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz688545",
+      "name": "兴福电子",
+      "score": 30.622708393555364,
+      "price": 77.39,
+      "rating": "Hold",
+      "metrics": {
+        "close": 77.39,
+        "ma10": 85.857,
+        "ma30": 65.729,
+        "rsi14": 67.14484035168904
+      },
+      "reason": "日线均线 MA10(85.86) > MA30(65.73) 处于上升趋势，价格回踩至 77.39 附近，RSI(67.1) 处于健康区间。",
+      "report_paths": {
+        "complete_report": "/Users/chenqing/Projects/TradingAgents/results/兴福电子-688545-2026-05-26/complete_report.md",
+        "final_trade_decision": "/Users/chenqing/Projects/TradingAgents/results/兴福电子-688545-2026-05-26/final_trade_decision.md"
+      }
+    }
+  ]
+}

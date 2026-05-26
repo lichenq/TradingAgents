@@ -1,0 +1,31 @@
+{
+  "trade_date": "2026-05-26",
+  "strategy": "trend_pullback",
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 1,
+    "min_volume_amount": 50000000.0
+  },
+  "all_screened_count": 29,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz688328",
+      "name": "深科达",
+      "score": 26.006017186815033,
+      "price": 70.1,
+      "rating": "Hold",
+      "metrics": {
+        "close": 70.1,
+        "ma10": 69.943,
+        "ma30": 55.507666666666665,
+        "rsi14": 66.80161943319837
+      },
+      "reason": "日线均线 MA10(69.94) > MA30(55.51) 处于上升趋势，价格回踩至 70.10 附近，RSI(66.8) 处于健康区间。",
+      "report_paths": {
+        "complete_report": "/Users/chenqing/Projects/TradingAgents/results/深科达-688328-2026-05-26/complete_report.md",
+        "final_trade_decision": "/Users/chenqing/Projects/TradingAgents/results/深科达-688328-2026-05-26/final_trade_decision.md"
+      }
+    }
+  ]
+}

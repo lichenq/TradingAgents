@@ -1,0 +1,12 @@
+{
+  "trade_date": "2026-05-26",
+  "strategy": "trend_pullback",
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 1,
+    "min_volume_amount": 50000000.0
+  },
+  "all_screened_count": 41,
+  "pruned": [],
+  "recommendations": []
+}
