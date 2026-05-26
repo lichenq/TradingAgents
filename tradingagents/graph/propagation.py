@@ -58,6 +58,7 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            "verified_market_facts": "",
         }
         if parallel_analysts:
             state["analyst_threads"] = {}

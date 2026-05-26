@@ -15,10 +15,12 @@ from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_language_instruction,
 )
+from tradingagents.agents.utils.position_context import get_rating_scale_guidance
 from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
+from tradingagents.agents.utils.verified_facts import append_verified_market_facts
 
 
 def create_portfolio_manager(llm):
@@ -45,12 +47,7 @@ def create_portfolio_manager(llm):
 
 ---
 
-**Rating Scale** (use exactly one):
-- **Buy**: Strong conviction to enter or add to position
-- **Overweight**: Favorable outlook, gradually increase exposure
-- **Hold**: Maintain current position, no action needed
-- **Underweight**: Reduce exposure, take partial profits
-- **Sell**: Exit position or avoid entry
+{get_rating_scale_guidance()}
 
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
@@ -63,6 +60,7 @@ def create_portfolio_manager(llm):
 
 Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
 
+        prompt = append_verified_market_facts(prompt, state)
         final_trade_decision = invoke_structured_or_freetext(
             structured_llm,
             llm,

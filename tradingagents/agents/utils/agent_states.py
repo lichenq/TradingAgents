@@ -69,6 +69,10 @@ class AgentState(MessagesState):
         str, "Report from the News Researcher of current world affairs"
     ]
     fundamentals_report: Annotated[str, "Report from the Fundamentals Researcher"]
+    verified_market_facts: Annotated[
+        str,
+        "Pre-fetched price/PE/PB (CN) injected before debate; agents must not invent valuation",
+    ]
 
     # researcher team discussion step
     investment_debate_state: Annotated[

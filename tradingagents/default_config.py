@@ -69,6 +69,7 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_RESULTS_DIR":         "results_dir",
     "TRADINGAGENTS_CACHE_DIR":           "data_cache_dir",
     "TRADINGAGENTS_MEMORY_LOG_PATH":     "memory_log_path",
+    "TRADINGAGENTS_POSITION_CONTEXT":    "position_context",
 }
 
 
@@ -120,6 +121,10 @@ def _cn_market_defaults() -> dict:
         "global_news_mode": "macro_plus_ticker",
         "global_news_article_limit": 15,
         "global_news_queries": list(CN_GLOBAL_NEWS_QUERIES),
+        # Optional extra codes for TTM PE comparison table (empty = primary ticker only).
+        # Set per run in config/env if needed, e.g. hydropower peers for 600900.
+        "cn_valuation_peers": [],
+        "require_verified_valuation": True,
         "benchmark_map": {
             ".NS": "^NSEI",
             ".BO": "^BSESN",
@@ -182,6 +187,8 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
     "output_language": "English",
+    # Decision framing: "empty" (flat, no position — default) or "held" (already own the ticker)
+    "position_context": "empty",
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,

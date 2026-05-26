@@ -1,4 +1,6 @@
 from tradingagents.agents.utils.agent_utils import get_language_instruction
+from tradingagents.agents.utils.position_context import get_position_assumption_instruction
+from tradingagents.agents.utils.verified_facts import append_verified_market_facts
 
 
 def create_bull_researcher(llm):
@@ -37,8 +39,9 @@ Latest world affairs news: {news_report}
 Conversation history of the debate: {history}
 Last bear argument: {current_response}
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position.
-""" + get_language_instruction()
+""" + get_position_assumption_instruction() + get_language_instruction()
 
+        prompt = append_verified_market_facts(prompt, state)
         response = llm.invoke(prompt)
 
         argument = f"Bull Analyst: {response.content}"

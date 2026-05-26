@@ -85,6 +85,12 @@ def run_cn_prefetch(
         _cache(f"kline:{code6}", block)
         return "kline", "ok" if block else "empty"
 
+    def task_valuation() -> Tuple[str, str]:
+        from tradingagents.dataflows.cn_valuation import fetch_and_cache_cn_valuation
+
+        status, ok = fetch_and_cache_cn_valuation(ticker, trade_date, config)
+        return "valuation", status if ok else f"FAILED {status}"
+
     def task_news() -> Tuple[str, str]:
         from tradingagents.dataflows.config import get_config
         from tradingagents.dataflows.interface import route_to_vendor
@@ -102,6 +108,7 @@ def run_cn_prefetch(
 
     jobs = [
         task_sector,
+        task_valuation,
         task_fundamentals,
         task_xueqiu,
         task_events,

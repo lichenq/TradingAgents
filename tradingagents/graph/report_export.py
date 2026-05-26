@@ -65,6 +65,11 @@ def save_analysis_report_md(
             content = "\n\n".join(f"### {name}\n{text}" for name, text in research_parts)
             sections.append(f"## II. Research Team Decision\n\n{content}")
 
+    verified = (final_state.get("verified_market_facts") or "").strip()
+    if verified:
+        (save_path / "verified_market_facts.md").write_text(verified, encoding="utf-8")
+        sections.append(f"## I-b. Verified Market Facts (pre-debate)\n\n{verified}")
+
     plan = final_state.get("investment_plan") or ""
     if plan:
         (save_path / "investment_plan.md").write_text(plan, encoding="utf-8")

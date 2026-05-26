@@ -1,6 +1,7 @@
 """Shared 5-tier rating vocabulary and a deterministic heuristic parser.
 
-The same five-tier scale (Buy, Overweight, Hold, Underweight, Sell) is used by:
+Rating semantics follow ``position_context`` in config (default ``empty`` = flat;
+see ``agents.utils.position_context``). The same five-tier scale is used by:
 - The Research Manager (investment plan recommendation)
 - The Portfolio Manager (final position decision)
 - The signal processor (rating extracted for downstream consumers)

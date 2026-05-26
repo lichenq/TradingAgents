@@ -54,12 +54,15 @@ def build_instrument_context(ticker: str, asset_type: str = "stock") -> str:
             "use it for 当前价/最新收盘价 instead of labeling the previous daily bar as today. "
             "Pass the analysis trade_date as end_date in get_stock_data / curr_date in get_indicators."
         )
+    from tradingagents.agents.utils.position_context import get_position_assumption_instruction
+
     return (
         f"The {instrument_label} to analyze is `{ticker}`. "
         "Use this exact ticker in every tool call, report, and recommendation, "
         "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`, `-USD`)."
         + extra_hint
         + cn_hint
+        + get_position_assumption_instruction()
     )
 
 def create_msg_delete(thread_key: str | None = None):

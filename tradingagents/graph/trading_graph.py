@@ -380,6 +380,7 @@ class TradingAgentsGraph:
         from tradingagents.dataflows.cn_prefetch import run_cn_prefetch
         from tradingagents.market import cn_uses_a_share_skill
 
+        verified_market_facts = ""
         if cn_uses_a_share_skill(company_name, self.config):
             workers = max(1, int(self.config.get("analyst_concurrency_limit", 4)))
             prefetch_lines = run_cn_prefetch(
@@ -388,9 +389,12 @@ class TradingAgentsGraph:
                 self.config,
                 max_workers=workers,
             )
+            from tradingagents.dataflows.cn_valuation import require_cn_valuation_ready
+
+            verified_market_facts = require_cn_valuation_ready(company_name, self.config)
             progress_extra = (
                 [f"分析师并行度: {workers}（市场/情绪/新闻/基本面同时跑）"]
-                + prefetch_lines[:6]
+                + prefetch_lines[:8]
                 + progress_extra
             )
 
@@ -406,6 +410,8 @@ class TradingAgentsGraph:
             past_context=past_context,
             parallel_analysts=parallel_analysts,
         )
+        if verified_market_facts:
+            init_agent_state["verified_market_facts"] = verified_market_facts
         args = self.propagator.get_graph_args()
 
         # Inject thread_id so same ticker+date resumes, different date starts fresh.
