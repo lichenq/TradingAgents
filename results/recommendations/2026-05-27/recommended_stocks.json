@@ -1,0 +1,49 @@
+{
+  "trade_date": "2026-05-27",
+  "strategy": "trend_pullback",
+  "parameters": {
+    "top_n": 40,
+    "validate_top": 4,
+    "min_volume_amount": 50000000.0
+  },
+  "all_screened_count": 7,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz300604",
+      "name": "长川科技",
+      "score": 20.441297081830466,
+      "price": 229.19,
+      "rating": "Hold",
+      "metrics": {
+        "close": 229.16,
+        "ma10": 227.62000000000003,
+        "ma30": 188.98833333333332,
+        "rsi14": 64.28383186190538
+      },
+      "reason": "日线均线 MA10(227.62) > MA30(188.99) 处于上升趋势，价格回踩至 229.16 附近，RSI(64.3) 处于健康区间。",
+      "report_paths": {
+        "complete_report": null,
+        "final_trade_decision": null
+      }
+    },
+    {
+      "code": "sz301308",
+      "name": "江波龙",
+      "score": 20.339920178285453,
+      "price": 572.03,
+      "rating": "Hold",
+      "metrics": {
+        "close": 572.05,
+        "ma10": 568.067,
+        "ma30": 472.05199999999996,
+        "rsi14": 64.0450861195542
+      },
+      "reason": "日线均线 MA10(568.07) > MA30(472.05) 处于上升趋势，价格回踩至 572.05 附近，RSI(64.0) 处于健康区间。",
+      "report_paths": {
+        "complete_report": "/Users/chenqing/Projects/TradingAgents/results/江波龙-301308-2026-05-27/complete_report.md",
+        "final_trade_decision": "/Users/chenqing/Projects/TradingAgents/results/江波龙-301308-2026-05-27/final_trade_decision.md"
+      }
+    }
+  ]
+}

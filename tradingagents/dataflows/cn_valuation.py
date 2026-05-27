@@ -174,8 +174,6 @@ def fetch_cn_valuation_payload(
         return False, {}, f"valuation missing price for {code6}"
     pe = primary.get("pe_ttm")
     is_etf = "ETF" in (primary.get("name") or "").upper()
-    if (not pe or pe <= 0) and not is_etf:
-        return False, {}, f"valuation missing pe_ttm for {code6}"
 
     eps_info = _fetch_events_eps(code6)
     peers = {c: quotes[c] for c in all_codes if c != code6 and c in quotes}
@@ -203,10 +201,12 @@ def format_valuation_markdown(payload: Dict[str, Any]) -> str:
         f"- **标的**: {p.get('name', '')} ({payload['ticker']})",
         f"- **现价**: {p['price']:.2f} 元",
     ]
-    if p.get("pe_ttm") and p["pe_ttm"] > 0:
+    if p.get("pe_ttm") is not None:
         lines.append(f"- **动态市盈率 TTM**: **{p['pe_ttm']:.2f}×**（{p.get('source', '')}）")
     elif "ETF" in (p.get("name") or "").upper():
         lines.append("- **动态市盈率 TTM**: 不适用（ETF 无个股 PE）")
+    else:
+        lines.append("- **动态市盈率 TTM**: 暂无")
     if p.get("pe_annualized_q_eps"):
         lines.append(f"- **参考市盈率（Q1 EPS×4 年化）**: {p['pe_annualized_q_eps']:.2f}×")
     if p.get("pb"):
@@ -246,9 +246,9 @@ def fetch_and_cache_cn_valuation(
         _cache(f"valuation:{code6}", md)
         _cache(f"valuation_json:{code6}", json.dumps(payload, ensure_ascii=False))
         pe = payload["primary"].get("pe_ttm")
-        if pe and pe > 0:
+        if pe is not None:
             return f"ok · TTM PE {pe:.1f}×", True
-        return "ok · ETF（无 PE）", True
+        return "ok · 暂无/ETF（无 PE）", True
     _cache(f"valuation:{code6}", "")
     return f"FAILED · {md[:120]}", False
 
