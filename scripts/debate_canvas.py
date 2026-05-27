@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-"""Interactive HTML debate canvas generator for TradingAgents."""
+"""Load debate payloads from SQLite and provide the SPA shell for serve_debate.py."""
 
 from __future__ import annotations
 
-import argparse
 import datetime
-import json
-import logging
-import os
 import re
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stderr)]
-)
-logger = logging.getLogger("html_generator")
+from tradingagents.graph.storage import query_report_flexible
+from tradingagents.market import normalize_a_share_code
 
 SPEAKER_CONFIGS = {
     "sentiment analyst": {
@@ -147,7 +138,7 @@ def get_speaker_config(speaker: str) -> Dict[str, Any]:
 
 
 def parse_markdown_debate(md_text: str) -> List[Dict[str, Any]]:
-    """Parse dialogue segments from the markdown file."""
+    """Parse ### speaker sections from consolidated report text (fallback only)."""
     pattern = re.compile(r'^###\s+([^\n]+)', re.MULTILINE)
     matches = list(pattern.finditer(md_text))
     
@@ -221,6 +212,134 @@ def extract_meta(md_text: str) -> Dict[str, str]:
             break
             
     return meta
+
+
+_DB_DEBATE_SECTIONS = (
+    ("market_report", "Market Analyst"),
+    ("sentiment_report", "Sentiment Analyst"),
+    ("bull_history", "Bull Researcher"),
+    ("bear_history", "Bear Researcher"),
+    ("investment_plan", "Research Manager"),
+    ("final_trade_decision", "Portfolio Manager"),
+)
+
+
+def _build_message(speaker: str, content: str) -> Optional[Dict[str, Any]]:
+    text = (content or "").strip()
+    if not text:
+        return None
+    config = get_speaker_config(speaker)
+    return {
+        "speaker": speaker,
+        "name_cn": config["name_cn"],
+        "avatar": config["avatar"],
+        "color": config["color"],
+        "align": config["align"],
+        "team": config["team"],
+        "content": text,
+    }
+
+
+def _rating_from_row(row: Dict[str, Any]) -> str:
+    for text in (row.get("final_trade_decision") or "", row.get("rating") or ""):
+        match = re.search(
+            r"Rating:\s*(Buy|Overweight|Hold|Underweight|Sell)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).capitalize()
+        match = re.search(
+            r"评级[：:]\s*(Buy|Overweight|Hold|Underweight|Sell)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).capitalize()
+    raw = (row.get("rating") or "").strip()
+    match = re.search(
+        r"\b(Buy|Overweight|Hold|Underweight|Sell)\b",
+        raw,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).capitalize()
+    return "Hold"
+
+
+def messages_from_report_row(row: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Build chat messages from SQLite structured columns (not filesystem markdown)."""
+    messages: List[Dict[str, Any]] = []
+    for field, speaker in _DB_DEBATE_SECTIONS:
+        msg = _build_message(speaker, row.get(field) or "")
+        if msg:
+            messages.append(msg)
+    if messages:
+        return messages
+    # Legacy imports may only have complete_report populated in the DB.
+    complete = (row.get("complete_report") or "").strip()
+    if complete:
+        return parse_markdown_debate(complete)
+    return []
+
+
+def meta_from_report_row(
+    row: Dict[str, Any],
+    ticker_query: str,
+    trade_date: str,
+) -> Dict[str, str]:
+    stored = (row.get("ticker") or ticker_query or "").strip()
+    display_ticker = stored.upper() if stored else ticker_query.strip().upper()
+    code6 = normalize_a_share_code(display_ticker)
+    if code6.isdigit() and len(code6) == 6:
+        display_ticker = code6
+    return {
+        "title": f"{display_ticker} 智能体投研辩论",
+        "ticker": display_ticker,
+        "date": (row.get("trade_date") or trade_date)[:10],
+        "rating": _rating_from_row(row),
+    }
+
+
+def load_debate_payload(
+    results_dir: str | Path,
+    ticker: str,
+    trade_date: str,
+) -> Dict[str, Any]:
+    """Load debate JSON for the SPA from SQLite (reports table)."""
+    ticker_s = (ticker or "").strip()
+    date_s = (trade_date or "").strip()[:10]
+    if not ticker_s or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_s):
+        return {"ok": False, "error": "Missing or invalid 'ticker' and 'date' parameters"}
+
+    row = query_report_flexible(results_dir, ticker_s, date_s)
+    if not row:
+        return {
+            "ok": False,
+            "error": (
+                f"No report in database for ticker '{ticker_s}' on {date_s}. "
+                "Run analyze/recommend or scripts/import_results_to_sqlite.py first."
+            ),
+        }
+
+    messages = messages_from_report_row(row)
+    if not messages:
+        return {
+            "ok": False,
+            "error": (
+                f"Report in database has no debate sections for '{ticker_s}' on {date_s}"
+            ),
+        }
+
+    meta = meta_from_report_row(row, ticker_s, date_s)
+    return {
+        "ok": True,
+        "title": meta["title"],
+        "ticker": meta["ticker"],
+        "date": meta["date"],
+        "rating": meta["rating"],
+        "messages": messages,
+    }
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -534,17 +653,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             div.innerHTML = `
                 <!-- Avatar -->
-                <div class="${avatarOrder} w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-md border shrink-0" style="border-color: ${titleColor}; background-color: ${titleColor}20">
+                <div class="${{avatarOrder}} w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-md border shrink-0" style="border-color: ${{titleColor}}; background-color: ${{titleColor}}20">
                     ${{msg.avatar}}
                 </div>
                 
                 <!-- Content Bubble -->
-                <div class="${contentOrder} max-w-[75%] space-y-1">
-                    <div class="flex items-center space-x-2 ${msg.align === 'right' ? 'justify-end' : ''}">
-                        <span class="text-xs font-bold" style="color: ${titleColor}">${{msg.name_cn}}</span>
+                <div class="${{contentOrder}} max-w-[75%] space-y-1">
+                    <div class="flex items-center space-x-2 ${{msg.align === 'right' ? 'justify-end' : ''}}">
+                        <span class="text-xs font-bold" style="color: ${{titleColor}}">${{msg.name_cn}}</span>
                         <span class="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider">${{msg.speaker}}</span>
                     </div>
-                    <div class="px-4 py-3 rounded-t-2xl shadow-md ${bubbleBg}">
+                    <div class="px-4 py-3 rounded-t-2xl shadow-md ${{bubbleBg}}">
                         <div class="markdown-content text-sm leading-relaxed" style="text-align: left;">
                             ${{htmlContent}}
                         </div>
@@ -655,66 +774,3 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </body>
 </html>
 """
-
-
-def generate_live_html(complete_report_path: str | Path, output_html_path: str | Path) -> bool:
-    """Generate WeChat/Discord-style Interactive HTML Debate Canvas from complete_report.md."""
-    try:
-        report_path = Path(complete_report_path)
-        if not report_path.is_file():
-            logger.error(f"Report file not found: {complete_report_path}")
-            return False
-            
-        md_text = report_path.read_text(encoding="utf-8")
-        
-        # 1. Extract metadata
-        meta = extract_meta(md_text)
-        
-        # 2. Parse dialogue messages
-        messages = parse_markdown_debate(md_text)
-        if not messages:
-            logger.warning(f"No dialogue segments parsed from {complete_report_path}")
-            return False
-            
-        # 3. Inject JSON and compile template
-        messages_json = json.dumps(messages, ensure_ascii=False, indent=2)
-        html_content = HTML_TEMPLATE.format(
-            title=meta["title"],
-            ticker=meta["ticker"],
-            date=meta["date"],
-            rating=meta["rating"],
-            messages_json=messages_json
-        )
-        
-        # 4. Write output file
-        out_path = Path(output_html_path)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(html_content, encoding="utf-8")
-        logger.info(f"Successfully generated interactive debate HTML at: {out_path.resolve()}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Failed to generate interactive HTML canvas: {e}", exc_info=True)
-        return False
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate an interactive single-file HTML live debate room from complete_report.md")
-    parser.add_argument(
-        "--report",
-        required=True,
-        help="Path to complete_report.md file"
-    )
-    parser.add_argument(
-        "--output",
-        required=True,
-        help="Path to output debate_live.html file"
-    )
-    args = parser.parse_args()
-    
-    ok = generate_live_html(args.report, args.output)
-    return 0 if ok else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

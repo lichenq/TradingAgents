@@ -207,7 +207,7 @@ def import_one_report(
     except ValueError:
         # Last resort: parse from Markdown header (标的 / 交易日)
         try:
-            from scripts.generate_live_html import extract_meta
+            from scripts.debate_canvas import extract_meta
 
             meta = extract_meta(text)
             ticker_fs = meta.get("ticker") or ""

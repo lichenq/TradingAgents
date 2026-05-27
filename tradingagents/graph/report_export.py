@@ -136,12 +136,4 @@ def save_analysis_report_md(
         import logging
         logging.getLogger(__name__).warning(f"Failed to sync report {ticker} on {trade_date} to SQLite: {e}")
 
-    # Generate WeChat/Discord-style Interactive HTML Debate Canvas
-    try:
-        from scripts.generate_live_html import generate_live_html
-        generate_live_html(alias, save_path / "debate_live.html")
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to generate interactive HTML canvas for {ticker} on {trade_date}: {e}")
-
     return complete

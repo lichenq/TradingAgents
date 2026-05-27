@@ -240,6 +240,32 @@ def query_recommendations(
         conn.close()
 
 
+def ticker_lookup_variants(ticker: str) -> List[str]:
+    """Build ticker aliases for SQLite lookup (601138, sh601138, 601138.SS, …)."""
+    from tradingagents.market import normalize_a_share_code, to_yahoo_a_share_symbol
+
+    seen: set[str] = set()
+    out: List[str] = []
+
+    def add(value: str) -> None:
+        v = (value or "").strip()
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+
+    raw = (ticker or "").strip()
+    add(raw)
+    add(raw.upper())
+    add(raw.lower())
+    code6 = normalize_a_share_code(raw)
+    if code6.isdigit() and len(code6) == 6:
+        add(code6)
+        prefix = "sh" if code6.startswith(("5", "6", "9")) else "sz"
+        add(f"{prefix}{code6}")
+        add(to_yahoo_a_share_symbol(code6))
+    return out
+
+
 def query_report(
     results_dir: str | Path,
     ticker: str,
@@ -262,6 +288,38 @@ def query_report(
         return None
     except Exception as e:
         logger.error(f"Failed to query report from SQLite: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def query_report_flexible(
+    results_dir: str | Path,
+    ticker: str,
+    trade_date: str,
+) -> Optional[Dict[str, Any]]:
+    """Retrieve a report row matching any common ticker alias for the trade date."""
+    date_s = str(trade_date).strip()[:10]
+    variants = ticker_lookup_variants(ticker)
+    if not variants:
+        return None
+    init_db(results_dir)
+    db_path = get_db_path(results_dir)
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        placeholders = ",".join("?" * len(variants))
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT * FROM reports WHERE trade_date = ? AND ticker IN ({placeholders}) LIMIT 1",
+            [date_s, *variants],
+        )
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+    except Exception as e:
+        logger.error(f"Failed flexible report query from SQLite: {e}")
         return None
     finally:
         conn.close()
