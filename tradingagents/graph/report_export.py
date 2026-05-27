@@ -121,9 +121,27 @@ def save_analysis_report_md(
         f"生成时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     )
     complete = save_path / f"{bundle_label}.md"
-    complete.write_text(header + "\n\n".join(sections), encoding="utf-8")
+    complete_report_text = header + "\n\n".join(sections)
+    complete.write_text(complete_report_text, encoding="utf-8")
     # Stable alias for scripts / IDE bookmarks
     alias = save_path / "complete_report.md"
     if alias != complete:
         alias.write_text(complete.read_text(encoding="utf-8"), encoding="utf-8")
+
+    # Sync full report into unified local SQLite database
+    try:
+        from tradingagents.graph.storage import save_report_to_sqlite
+        save_report_to_sqlite(final_state, ticker, trade_date, complete_report_text=complete_report_text)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to sync report {ticker} on {trade_date} to SQLite: {e}")
+
+    # Generate WeChat/Discord-style Interactive HTML Debate Canvas
+    try:
+        from scripts.generate_live_html import generate_live_html
+        generate_live_html(alias, save_path / "debate_live.html")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to generate interactive HTML canvas for {ticker} on {trade_date}: {e}")
+
     return complete
