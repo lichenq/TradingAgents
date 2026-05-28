@@ -106,6 +106,14 @@ def run_cn_prefetch(
         _cache(f"news_macro:{code6}", macro)
         return "news", "ok"
 
+    def task_fund_flow() -> Tuple[str, str]:
+        from tradingagents.dataflows.fund_flow import fetch_and_format_cn_fund_flow
+
+        block = fetch_and_format_cn_fund_flow(ticker)
+        _cache(f"fund_flow:{code6}", block)
+        status = "ok" if block and "暂无" not in block else "empty"
+        return "fund_flow", status
+
     jobs = [
         task_sector,
         task_valuation,
@@ -114,6 +122,7 @@ def run_cn_prefetch(
         task_events,
         task_kline,
         task_news,
+        task_fund_flow,
     ]
     workers = max(1, min(max_workers, len(jobs)))
     lines: List[str] = []

@@ -69,7 +69,9 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_RESULTS_DIR":         "results_dir",
     "TRADINGAGENTS_CACHE_DIR":           "data_cache_dir",
     "TRADINGAGENTS_MEMORY_LOG_PATH":     "memory_log_path",
+    "TRADINGAGENTS_MEMORY_BACKEND":      "memory_log_backend",
     "TRADINGAGENTS_POSITION_CONTEXT":    "position_context",
+    "TRADINGAGENTS_RISK_REGIME":         "position_context_regime",
 }
 
 # Optional numeric overrides (defaults are None in DEFAULT_CONFIG).
@@ -172,6 +174,8 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "results_dir": _default_storage_dir("logs", env_var="TRADINGAGENTS_RESULTS_DIR"),
     "data_cache_dir": _default_storage_dir("cache", env_var="TRADINGAGENTS_CACHE_DIR"),
     "memory_log_path": _default_memory_log_path(),
+    # Memory storage backend: "sqlite" (recommended) or "file".
+    "memory_log_backend": "sqlite",
     # Optional cap on the number of resolved memory log entries. When set,
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
@@ -200,6 +204,7 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "output_language": "English",
     # Decision framing: "empty" (flat, no position — default) or "held" (already own the ticker)
     "position_context": "empty",
+    "position_context_regime": "auto",
     # User holdings (optional; injected into verified_market_facts when set)
     "position_cost": None,
     "position_shares": None,

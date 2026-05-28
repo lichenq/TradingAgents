@@ -27,6 +27,18 @@ _CN_DATA_RULES = (
 )
 
 
+_P_COCT_FUNDAMENTALS_RULES = (
+    "\n\n## 【Universal P-CoCT & Source Credibility Rules】\n"
+    "1. Strict Anti-Hallucination: Every clue, '蛛丝马迹', or data point you mention (e.g., Capex expansion, CIP increase, R&D anomalies, licenses, customer partnership shifts) MUST be 100% verified and present in the tool results, prefetch blocks, or state facts. Never fabricate numbers, patents, procurement, or contracts.\n"
+    "2. Source Credibility Grading (等级与源头标注): You MUST label each piece of evidence with its credibility tier:\n"
+    "   - [L1: Absolute Facts] (绝对事实): Audited financial reports, official exchange filings, SIPO/USPTO patents.\n"
+    "   - [L2: Physical Anomalies] (物理异动): Customs import/export stats, official corporate job postings, bidding/procurement notices.\n"
+    "   - [L3: Professional Reports] (专业研报): Reputable media (Bloomberg, Reuters, CLS) in-depth coverage, authoritative broker analyst research.\n"
+    "   - [L4: Market Rumors] (市场传言): Social media chatter, online forums, unverified rumors (DO NOT use L4 for fundamental causal chain reasoning, only for sentiment references).\n"
+    "3. Preemptive Causal Chain of Thought (P-CoCT先导推演): Focus on 'bottleneck assets' and 'irreversible committed costs' (Sunk Costs). Analyze Capex, CIP, long-term prepaid expenses, or R&D deviations. Deduce what future strategic bottlenecks or revaluation events these costly commitments reveal, and analyze the lead-time (时滞) needed for licenses/audits before these bear fruit in earnings.\n"
+)
+
+
 def _prefetch_cn_fundamentals(ticker: str, trade_date: str) -> str:
     cfg = get_config()
     if not cn_uses_a_share_skill(ticker, cfg):
@@ -76,6 +88,7 @@ def create_fundamentals_analyst(llm, *, analyst_thread_key: str | None = None):
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + f" Use the available tools: {tool_hint}."
             + get_language_instruction()
+            + _P_COCT_FUNDAMENTALS_RULES
         )
         if is_cn:
             system_message += _CN_DATA_RULES

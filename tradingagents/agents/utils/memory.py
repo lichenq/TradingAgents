@@ -1,29 +1,33 @@
-"""Append-only markdown decision log for TradingAgents."""
+"""Decision log for TradingAgents (SQLite-first, file fallback)."""
 
 from typing import List, Optional
 from pathlib import Path
+import datetime
 import os
 import re
+import sqlite3
 
 from tradingagents.agents.utils.rating import parse_rating
 
 
 class TradingMemoryLog:
-    """Append-only markdown log of trading decisions and reflections."""
+    """Decision log of trading decisions and reflections."""
 
-    # HTML comment: cannot appear in LLM prose output, safe as a hard delimiter
     _SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n"
-    # Precompiled patterns — avoids re-compilation on every load_entries() call
     _DECISION_RE = re.compile(r"DECISION:\n(.*?)(?=\nREFLECTION:|\Z)", re.DOTALL)
     _REFLECTION_RE = re.compile(r"REFLECTION:\n(.*?)$", re.DOTALL)
 
     def __init__(self, config: dict = None):
         cfg = config or {}
+        self._backend = str(cfg.get("memory_log_backend") or "sqlite").strip().lower()
+        self._db_path: Optional[Path] = None
         self._log_path = None
         path = cfg.get("memory_log_path")
         if path:
             self._log_path = self._resolve_writable_log_path(Path(path).expanduser())
-        # Optional cap on resolved entries. None disables rotation.
+        if self._backend == "sqlite":
+            self._db_path = self._resolve_db_path(cfg)
+            self._ensure_db_schema()
         self._max_entries = cfg.get("memory_log_max_entries")
 
     @staticmethod
@@ -68,7 +72,47 @@ class TradingMemoryLog:
         self._log_path = self._resolve_writable_log_path(self._log_path)
         return self._log_path
 
-    # --- Write path (Phase A) ---
+    def _resolve_db_path(self, cfg: dict) -> Path:
+        from tradingagents.graph.storage import get_db_path
+        results_dir = cfg.get("results_dir")
+        if results_dir:
+            return get_db_path(results_dir)
+        fallback_dir = Path.cwd() / ".tradingagents" / "logs"
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        return fallback_dir / "trading_agents.db"
+
+    def _ensure_db_schema(self) -> None:
+        if not self._db_path:
+            return
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(self._db_path))
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS memory_log_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trade_date TEXT NOT NULL,
+                    ticker TEXT NOT NULL,
+                    rating TEXT NOT NULL,
+                    pending INTEGER NOT NULL DEFAULT 1,
+                    raw_return REAL,
+                    alpha_return REAL,
+                    holding_days INTEGER,
+                    decision TEXT,
+                    reflection TEXT,
+                    created_at TEXT,
+                    updated_at TEXT,
+                    UNIQUE(ticker, trade_date)
+                )
+                """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memory_log_pending ON memory_log_entries(pending, ticker)"
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def store_decision(
         self,
@@ -77,6 +121,9 @@ class TradingMemoryLog:
         final_trade_decision: str,
     ) -> None:
         """Append pending entry at end of propagate(). No LLM call."""
+        if self._backend == "sqlite":
+            return self._store_decision_sqlite(ticker, trade_date, final_trade_decision)
+
         log_path = self._rebind_log_path_if_needed()
         if not log_path:
             return
@@ -92,10 +139,32 @@ class TradingMemoryLog:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(entry)
 
-    # --- Read path (Phase A) ---
+    def _store_decision_sqlite(self, ticker: str, trade_date: str, final_trade_decision: str) -> None:
+        if not self._db_path:
+            return
+        rating = parse_rating(final_trade_decision)
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = sqlite3.connect(str(self._db_path))
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO memory_log_entries (
+                    trade_date, ticker, rating, pending,
+                    decision, reflection, created_at, updated_at
+                ) VALUES (?, ?, ?, 1, ?, '', ?, ?)
+                """,
+                (trade_date, ticker, rating, final_trade_decision, now, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def load_entries(self) -> List[dict]:
         """Parse all entries from log. Returns list of dicts."""
+        if self._backend == "sqlite":
+            return self._load_entries_sqlite()
+
         if not self._log_path or not self._log_path.exists():
             return []
         text = self._log_path.read_text(encoding="utf-8")
@@ -106,6 +175,45 @@ class TradingMemoryLog:
             if parsed:
                 entries.append(parsed)
         return entries
+
+    def _load_entries_sqlite(self) -> List[dict]:
+        if not self._db_path:
+            return []
+        conn = sqlite3.connect(str(self._db_path))
+        conn.row_factory = sqlite3.Row
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT trade_date, ticker, rating, pending, raw_return, alpha_return,
+                       holding_days, decision, reflection
+                FROM memory_log_entries
+                ORDER BY trade_date ASC, id ASC
+                """
+            )
+            rows = cursor.fetchall()
+            out: List[dict] = []
+            for row in rows:
+                pending = bool(row["pending"])
+                raw = None if row["raw_return"] is None else f"{float(row['raw_return']):+.1%}"
+                alpha = None if row["alpha_return"] is None else f"{float(row['alpha_return']):+.1%}"
+                holding = None if row["holding_days"] is None else f"{int(row['holding_days'])}d"
+                out.append(
+                    {
+                        "date": row["trade_date"],
+                        "ticker": row["ticker"],
+                        "rating": row["rating"],
+                        "pending": pending,
+                        "raw": raw,
+                        "alpha": alpha,
+                        "holding": holding,
+                        "decision": row["decision"] or "",
+                        "reflection": row["reflection"] or "",
+                    }
+                )
+            return out
+        finally:
+            conn.close()
 
     def get_pending_entries(self) -> List[dict]:
         """Return entries with outcome:pending (for Phase B)."""
@@ -155,6 +263,20 @@ class TradingMemoryLog:
         its tag with return figures, and appends a REFLECTION section.  Uses
         a temp-file + os.replace() so a crash mid-write never corrupts the log.
         """
+        if self._backend == "sqlite":
+            return self.batch_update_with_outcomes(
+                [
+                    {
+                        "ticker": ticker,
+                        "trade_date": trade_date,
+                        "raw_return": raw_return,
+                        "alpha_return": alpha_return,
+                        "holding_days": holding_days,
+                        "reflection": reflection,
+                    }
+                ]
+            )
+
         if not self._log_path or not self._log_path.exists():
             return
 
@@ -211,6 +333,9 @@ class TradingMemoryLog:
         Each element of updates must have keys: ticker, trade_date,
         raw_return, alpha_return, holding_days, reflection.
         """
+        if self._backend == "sqlite":
+            return self._batch_update_with_outcomes_sqlite(updates)
+
         if not self._log_path or not self._log_path.exists() or not updates:
             return
 
@@ -259,6 +384,40 @@ class TradingMemoryLog:
         tmp_path.write_text(new_text, encoding="utf-8")
         tmp_path.replace(self._log_path)
 
+    def _batch_update_with_outcomes_sqlite(self, updates: List[dict]) -> None:
+        if not self._db_path or not updates:
+            return
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = sqlite3.connect(str(self._db_path))
+        try:
+            cursor = conn.cursor()
+            for upd in updates:
+                cursor.execute(
+                    """
+                    UPDATE memory_log_entries
+                    SET pending = 0,
+                        raw_return = ?,
+                        alpha_return = ?,
+                        holding_days = ?,
+                        reflection = ?,
+                        updated_at = ?
+                    WHERE ticker = ? AND trade_date = ? AND pending = 1
+                    """,
+                    (
+                        float(upd["raw_return"]),
+                        float(upd["alpha_return"]),
+                        int(upd["holding_days"]),
+                        upd["reflection"],
+                        now,
+                        upd["ticker"],
+                        upd["trade_date"],
+                    ),
+                )
+            self._apply_rotation_sqlite(cursor)
+            conn.commit()
+        finally:
+            conn.close()
+
     # --- Helpers ---
 
     def _apply_rotation(self, blocks: List[str]) -> List[str]:
@@ -297,6 +456,27 @@ class TradingMemoryLog:
                 continue
             kept.append(block)
         return kept
+
+    def _apply_rotation_sqlite(self, cursor: sqlite3.Cursor) -> None:
+        if not self._max_entries or self._max_entries <= 0:
+            return
+        cursor.execute("SELECT COUNT(1) FROM memory_log_entries WHERE pending = 0")
+        resolved_count = int(cursor.fetchone()[0] or 0)
+        if resolved_count <= self._max_entries:
+            return
+        to_drop = resolved_count - int(self._max_entries)
+        cursor.execute(
+            """
+            DELETE FROM memory_log_entries
+            WHERE id IN (
+                SELECT id FROM memory_log_entries
+                WHERE pending = 0
+                ORDER BY trade_date ASC, id ASC
+                LIMIT ?
+            )
+            """,
+            (to_drop,),
+        )
 
     def _parse_entry(self, raw: str) -> Optional[dict]:
         lines = raw.strip().splitlines()

@@ -255,15 +255,23 @@ def fetch_and_cache_cn_valuation(
 
 def require_cn_valuation_ready(ticker: str, config: dict) -> str:
     """Return verified markdown block or raise if required and missing."""
-    if not config.get("require_verified_valuation", True):
-        block = get_prefetched(f"valuation:{normalize_a_share_code(ticker)}") or ""
-        return block
     code6 = normalize_a_share_code(ticker)
-    block = get_prefetched(f"valuation:{code6}") or ""
-    if not block.strip():
-        raise RuntimeError(
-            f"A-share valuation prefetch failed for {code6}: "
-            "debate cannot start without verified price/PE. "
-            "Check a-share-data skill / network, or set require_verified_valuation=false."
-        )
-    return block
+    val_block = ""
+    
+    if config.get("require_verified_valuation", True):
+        val_block = get_prefetched(f"valuation:{code6}") or ""
+        if not val_block.strip():
+            raise RuntimeError(
+                f"A-share valuation prefetch failed for {code6}: "
+                "debate cannot start without verified price/PE. "
+                "Check a-share-data skill / network, or set require_verified_valuation=false."
+            )
+    else:
+        val_block = get_prefetched(f"valuation:{code6}") or ""
+
+    # 动态调取最新资金主力净流入并进行拼接注入
+    ff_block = get_prefetched(f"fund_flow:{code6}") or ""
+    if ff_block.strip():
+        return f"{val_block.rstrip()}\n\n{ff_block.strip()}\n"
+
+    return val_block

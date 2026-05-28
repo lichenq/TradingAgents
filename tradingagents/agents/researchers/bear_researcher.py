@@ -25,15 +25,14 @@ def create_bear_researcher(llm):
         prompt = f"""You are a Bear Analyst making the case against investing in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
 
 Key points to focus on:
-
+- Fact Credibility Auditing & De-bunking (可信度打假与审计): Critically analyze the bull analyst's arguments. Check if their optimistic projections are built on low-credibility sources like [L4: Market Rumors] (social media chatter, forum leaks) rather than [L1: Absolute Facts] or [L2: Physical Anomalies]. Boldly call out these logical leaps!
+- Lead-Time & Transmission Lag Obstacles (时滞与传导壁垒): Even if the bull analyst points to a genuine L1/L2 preemptive indicator (like a Capex surge), highlight the extreme physical lead-times, regulatory audits (e.g., FDA, AS9100), and pricing-power constraints that could delay or completely block these investments from turning into net earnings.
 - Risks and Challenges: Highlight factors like market saturation, financial instability, or macroeconomic threats that could hinder the stock's performance.
 - Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning, declining innovation, or threats from competitors.
-- Negative Indicators: Use evidence from financial data, market trends, or recent adverse news to support your position.
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
 - Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
 
 Resources available:
-
 Market research report: {market_research_report}
 Social media sentiment report: {sentiment_report}
 Latest world affairs news: {news_report}
