@@ -47,21 +47,33 @@ class TestSQLiteStorage(unittest.TestCase):
         final_state = {
             "market_report": "market text",
             "sentiment_report": "sentiment text",
+            "news_report": "news text",
+            "fundamentals_report": "fundamentals text",
             "final_trade_decision": "final text rating: Buy",
             "final_trade_decision_rating": "Buy",
             "investment_debate_state": {
                 "bull_history": "bull history text",
                 "bear_history": "bear history text",
-            }
+            },
+            "risk_debate_state": {
+                "aggressive_history": "aggressive risk text",
+                "conservative_history": "conservative risk text",
+                "neutral_history": "neutral risk text",
+            },
         }
-        save_report_to_sqlite(final_state, "sz300604", "2026-05-27", db_path=self.db_path, complete_report_text="complete text")
+        save_report_to_sqlite(final_state, "300604", "2026-05-27", db_path=self.db_path, complete_report_text="complete text")
 
         reports = get_reports_from_sqlite("sz300604", "2026-05-27", db_path=self.db_path)
         self.assertEqual(len(reports), 1)
         self.assertEqual(recs[0]["code"], "sz300604")
         self.assertEqual(reports[0]["ticker"], "sz300604")
         self.assertEqual(reports[0]["market_report"], "market text")
+        self.assertEqual(reports[0]["news_report"], "news text")
+        self.assertEqual(reports[0]["fundamentals_report"], "fundamentals text")
         self.assertEqual(reports[0]["bull_history"], "bull history text")
+        self.assertEqual(reports[0]["aggressive_history"], "aggressive risk text")
+        self.assertEqual(reports[0]["conservative_history"], "conservative risk text")
+        self.assertEqual(reports[0]["neutral_history"], "neutral risk text")
         self.assertEqual(reports[0]["complete_report"], "complete text")
 
         # 4. Save and query backtest audits

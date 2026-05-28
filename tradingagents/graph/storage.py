@@ -68,6 +68,7 @@ def init_db(results_dir_or_db_path: str | Path) -> None:
                 complete_report TEXT,
                 final_trade_decision TEXT,
                 investment_plan TEXT,
+                trader_investment_plan TEXT,
                 market_report TEXT,
                 sentiment_report TEXT,
                 bull_history TEXT,
@@ -76,6 +77,20 @@ def init_db(results_dir_or_db_path: str | Path) -> None:
                 UNIQUE(ticker, trade_date)
             )
         """)
+        # Backward-compatible schema migration for existing SQLite files.
+        cursor.execute("PRAGMA table_info(reports)")
+        report_columns = {row[1] for row in cursor.fetchall()}
+        if "trader_investment_plan" not in report_columns:
+            cursor.execute("ALTER TABLE reports ADD COLUMN trader_investment_plan TEXT")
+        for col in (
+            "aggressive_history",
+            "conservative_history",
+            "neutral_history",
+            "news_report",
+            "fundamentals_report",
+        ):
+            if col not in report_columns:
+                cursor.execute(f"ALTER TABLE reports ADD COLUMN {col} TEXT")
 
         # Table: backtest_audits (Automated backtesting and AI reflection results)
         cursor.execute("""
@@ -150,6 +165,18 @@ def save_recommendation(
         conn.close()
 
 
+def normalize_report_ticker(ticker: str) -> str:
+    """Canonical SQLite key: sh/sz + 6-digit code for A-shares."""
+    from tradingagents.market import normalize_a_share_code
+
+    raw = (ticker or "").strip()
+    code6 = normalize_a_share_code(raw)
+    if code6.isdigit() and len(code6) == 6:
+        prefix = "sh" if code6.startswith(("5", "6", "9")) else "sz"
+        return f"{prefix}{code6}"
+    return raw
+
+
 def save_report(
     results_dir: str | Path,
     ticker: str,
@@ -158,36 +185,61 @@ def save_report(
     complete_report: str,
     final_trade_decision: str = "",
     investment_plan: str = "",
+    trader_investment_plan: str = "",
     market_report: str = "",
     sentiment_report: str = "",
+    news_report: str = "",
+    fundamentals_report: str = "",
     bull_history: str = "",
     bear_history: str = "",
+    aggressive_history: str = "",
+    conservative_history: str = "",
+    neutral_history: str = "",
     db_path: Optional[str | Path] = None
 ) -> None:
     """Save or replace a deep multi-agent report in the database."""
     resolved_db = _resolve_db(results_dir, db_path)
     init_db(resolved_db)
+    ticker_key = normalize_report_ticker(ticker)
     conn = sqlite3.connect(str(resolved_db))
     try:
         cursor = conn.cursor()
         created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
+        # Remove legacy duplicate rows (e.g. bare 600415 vs sh600415).
+        variants = ticker_lookup_variants(ticker)
+        if variants:
+            placeholders = ",".join("?" * len(variants))
+            cursor.execute(
+                f"DELETE FROM reports WHERE trade_date = ? AND ticker IN ({placeholders}) "
+                f"AND ticker <> ?",
+                [trade_date[:10], *variants, ticker_key],
+            )
+
         cursor.execute("""
             INSERT OR REPLACE INTO reports (
                 ticker, trade_date, rating, complete_report, final_trade_decision, investment_plan,
-                market_report, sentiment_report, bull_history, bear_history, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                trader_investment_plan, market_report, sentiment_report, news_report,
+                fundamentals_report, bull_history, bear_history,
+                aggressive_history, conservative_history, neutral_history, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            ticker,
+            ticker_key,
             trade_date,
             rating,
             complete_report,
             final_trade_decision,
             investment_plan,
+            trader_investment_plan,
             market_report,
             sentiment_report,
+            news_report,
+            fundamentals_report,
             bull_history,
             bear_history,
+            aggressive_history,
+            conservative_history,
+            neutral_history,
             created_at
         ))
         conn.commit()
@@ -310,9 +362,20 @@ def query_report_flexible(
     try:
         placeholders = ",".join("?" * len(variants))
         cursor = conn.cursor()
+        preferred = normalize_report_ticker(ticker)
+        query = (
+            f"SELECT * FROM reports "
+            f"WHERE trade_date = ? AND ticker IN ({placeholders}) "
+            "ORDER BY "
+            "CASE WHEN COALESCE(trader_investment_plan, '') <> '' THEN 0 ELSE 1 END, "
+            "CASE WHEN COALESCE(aggressive_history, '') <> '' THEN 0 ELSE 1 END, "
+            f"CASE WHEN ticker = ? THEN 0 ELSE 1 END, "
+            "created_at DESC "
+            "LIMIT 1"
+        )
         cursor.execute(
-            f"SELECT * FROM reports WHERE trade_date = ? AND ticker IN ({placeholders}) LIMIT 1",
-            [date_s, *variants],
+            query,
+            [date_s, *variants, preferred],
         )
         row = cursor.fetchone()
         if row:
@@ -344,14 +407,22 @@ def save_report_to_sqlite(
                 break
     final_trade_decision = final_state.get("final_trade_decision") or ""
     investment_plan = final_state.get("investment_plan") or ""
+    trader_investment_plan = final_state.get("trader_investment_plan") or ""
     
     market_report = final_state.get("market_report") or ""
     sentiment_report = final_state.get("sentiment_report") or ""
-    
+    news_report = final_state.get("news_report") or ""
+    fundamentals_report = final_state.get("fundamentals_report") or ""
+
     debate_state = final_state.get("investment_debate_state") or {}
     bull_history = debate_state.get("bull_history") or ""
     bear_history = debate_state.get("bear_history") or ""
-    
+
+    risk_state = final_state.get("risk_debate_state") or {}
+    aggressive_history = risk_state.get("aggressive_history") or ""
+    conservative_history = risk_state.get("conservative_history") or ""
+    neutral_history = risk_state.get("neutral_history") or ""
+
     save_report(
         results_dir=results_dir,
         ticker=ticker,
@@ -360,10 +431,16 @@ def save_report_to_sqlite(
         complete_report=complete_report_text,
         final_trade_decision=final_trade_decision,
         investment_plan=investment_plan,
+        trader_investment_plan=trader_investment_plan,
         market_report=market_report,
         sentiment_report=sentiment_report,
+        news_report=news_report,
+        fundamentals_report=fundamentals_report,
         bull_history=bull_history,
         bear_history=bear_history,
+        aggressive_history=aggressive_history,
+        conservative_history=conservative_history,
+        neutral_history=neutral_history,
         db_path=db_path
     )
 

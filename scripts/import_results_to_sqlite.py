@@ -130,6 +130,60 @@ def load_state_json(path: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _analyst_reports_from_bundle(
+    bundle_dir: Path,
+    data: Optional[Dict[str, Any]],
+) -> Dict[str, str]:
+    """Analyst team texts from JSON state and/or 1_analysts/*.md."""
+    analysts_dir = bundle_dir / "1_analysts"
+    out = {
+        "market_report": "",
+        "sentiment_report": "",
+        "news_report": "",
+        "fundamentals_report": "",
+    }
+    if data:
+        out["market_report"] = data.get("market_report") or ""
+        out["sentiment_report"] = data.get("sentiment_report") or ""
+        out["news_report"] = data.get("news_report") or ""
+        out["fundamentals_report"] = data.get("fundamentals_report") or ""
+    for key, fname in (
+        ("market_report", "market.md"),
+        ("sentiment_report", "sentiment.md"),
+        ("news_report", "news.md"),
+        ("fundamentals_report", "fundamentals.md"),
+    ):
+        if not out[key]:
+            out[key] = _read(analysts_dir / fname)
+    return out
+
+
+def _risk_histories_from_bundle(
+    bundle_dir: Path,
+    data: Optional[Dict[str, Any]],
+) -> Dict[str, str]:
+    """Risk debate texts from JSON state and/or 4_risk/*.md."""
+    risk_dir = bundle_dir / "4_risk"
+    out = {
+        "aggressive_history": "",
+        "conservative_history": "",
+        "neutral_history": "",
+    }
+    if data:
+        risk = data.get("risk_debate_state") or {}
+        out["aggressive_history"] = risk.get("aggressive_history") or ""
+        out["conservative_history"] = risk.get("conservative_history") or ""
+        out["neutral_history"] = risk.get("neutral_history") or ""
+    for key, fname in (
+        ("aggressive_history", "aggressive.md"),
+        ("conservative_history", "conservative.md"),
+        ("neutral_history", "neutral.md"),
+    ):
+        if not out[key]:
+            out[key] = _read(risk_dir / fname)
+    return out
+
+
 def build_save_report_args(
     bundle_dir: Path,
     complete_report: str,
@@ -138,8 +192,11 @@ def build_save_report_args(
     trade_date: str,
 ) -> Dict[str, Any]:
     """Keyword args for ``save_report``."""
+    analysts = _analyst_reports_from_bundle(bundle_dir, data)
+    risk = _risk_histories_from_bundle(bundle_dir, data)
     if data:
         debate = data.get("investment_debate_state") or {}
+        trader_plan = data.get("trader_investment_plan") or _read(bundle_dir / "3_trading" / "trader.md")
         rating = (data.get("final_trade_decision_rating") or "").strip()
         if not rating:
             rating = _rating_from_final_decision(data.get("final_trade_decision") or "")
@@ -152,13 +209,13 @@ def build_save_report_args(
             "complete_report": complete_report,
             "final_trade_decision": data.get("final_trade_decision") or "",
             "investment_plan": data.get("investment_plan") or "",
-            "market_report": data.get("market_report") or "",
-            "sentiment_report": data.get("sentiment_report") or "",
+            "trader_investment_plan": trader_plan,
             "bull_history": debate.get("bull_history") or "",
             "bear_history": debate.get("bear_history") or "",
+            **analysts,
+            **risk,
         }
 
-    analysts = bundle_dir / "1_analysts"
     research = bundle_dir / "2_research"
     return {
         "ticker": ticker,
@@ -170,10 +227,11 @@ def build_save_report_args(
         "complete_report": complete_report,
         "final_trade_decision": _read(bundle_dir / "final_trade_decision.md"),
         "investment_plan": _read(bundle_dir / "investment_plan.md"),
-        "market_report": _read(analysts / "market.md"),
-        "sentiment_report": _read(analysts / "sentiment.md"),
+        "trader_investment_plan": _read(bundle_dir / "3_trading" / "trader.md"),
         "bull_history": _read(research / "bull.md"),
         "bear_history": _read(research / "bear.md"),
+        **analysts,
+        **risk,
     }
 
 

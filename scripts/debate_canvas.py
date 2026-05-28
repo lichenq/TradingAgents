@@ -217,9 +217,15 @@ def extract_meta(md_text: str) -> Dict[str, str]:
 _DB_DEBATE_SECTIONS = (
     ("market_report", "Market Analyst"),
     ("sentiment_report", "Sentiment Analyst"),
+    ("news_report", "News Analyst"),
+    ("fundamentals_report", "Fundamentals Analyst"),
     ("bull_history", "Bull Researcher"),
     ("bear_history", "Bear Researcher"),
     ("investment_plan", "Research Manager"),
+    ("trader_investment_plan", "Trader"),
+    ("aggressive_history", "Aggressive Analyst"),
+    ("conservative_history", "Conservative Analyst"),
+    ("neutral_history", "Neutral Analyst"),
     ("final_trade_decision", "Portfolio Manager"),
 )
 
@@ -268,19 +274,13 @@ def _rating_from_row(row: Dict[str, Any]) -> str:
 
 
 def messages_from_report_row(row: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Build chat messages from SQLite structured columns (not filesystem markdown)."""
+    """Build chat messages strictly from SQLite structured columns."""
     messages: List[Dict[str, Any]] = []
     for field, speaker in _DB_DEBATE_SECTIONS:
         msg = _build_message(speaker, row.get(field) or "")
         if msg:
             messages.append(msg)
-    if messages:
-        return messages
-    # Legacy imports may only have complete_report populated in the DB.
-    complete = (row.get("complete_report") or "").strip()
-    if complete:
-        return parse_markdown_debate(complete)
-    return []
+    return messages
 
 
 def meta_from_report_row(
