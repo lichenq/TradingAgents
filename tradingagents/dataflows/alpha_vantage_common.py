@@ -83,6 +83,27 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
     return response_text
 
 
+def _raise_if_api_error(response_text: str) -> None:
+    """Raise on Alpha Vantage JSON error/premium/quota responses (non-CSV body)."""
+    text = (response_text or "").strip()
+    if not text.startswith("{"):
+        return
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return
+    if not isinstance(payload, dict):
+        return
+    for key in ("Error Message", "Information", "Note"):
+        message = payload.get(key)
+        if not message:
+            continue
+        msg = str(message)
+        lower = msg.lower()
+        if "rate limit" in lower or "api key" in lower:
+            raise AlphaVantageRateLimitError(f"Alpha Vantage rate limit exceeded: {msg}")
+        raise ValueError(f"Alpha Vantage API error ({key}): {msg}")
+
 
 def _filter_csv_by_date_range(csv_data: str, start_date: str, end_date: str) -> str:
     """
@@ -98,6 +119,8 @@ def _filter_csv_by_date_range(csv_data: str, start_date: str, end_date: str) -> 
     """
     if not csv_data or csv_data.strip() == "":
         return csv_data
+
+    _raise_if_api_error(csv_data)
 
     try:
         # Parse CSV data

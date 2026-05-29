@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from tradingagents.dataflows.a_share_runner import run_script
 from tradingagents.dataflows.cn_market_dates import cn_indicator_end_date, cn_ohlcv_end_date
 from tradingagents.dataflows.cn_sentiment import fetch_cn_news_block
-from tradingagents.market import normalize_a_share_code
+from tradingagents.market import normalize_a_share_code, is_hk_ticker
 
 # Per-process cache: fundamentals analyst calls get_fundamentals + 3 statements → same fetch.
 _fundamentals_cache: Dict[tuple[str, str], str] = {}
@@ -103,6 +103,35 @@ def _cn_market_asof_header(
     return "\n".join(lines)
 
 
+def _build_hk_ohlcv_block(
+    symbol: str,
+    start_date: str,
+    end_date: str,
+) -> str:
+    ok, raw, data = run_script(
+        "fetch_hk_data.py",
+        ["--symbol", symbol, "--kline", "--start", start_date, "--end", end_date],
+        timeout=35,
+    )
+    if not ok or not isinstance(data, dict):
+        return raw or f"No data found for HK symbol '{symbol}'"
+    
+    kline = data.get("kline") or []
+    if not kline:
+        return f"No daily bars returned for HK symbol '{symbol}'"
+        
+    lines = [
+        f"# HK stock data for {symbol.upper()} from {start_date} to {end_date}",
+        f"# Total records: {len(kline)}",
+        f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "time,open,high,low,close,volume,pctChg"
+    ]
+    for row in kline:
+        lines.append(f"{row['time']},{row['open']},{row['high']},{row['low']},{row['close']},{row['volume']},{row.get('pctChg', 0.0)}")
+    return "\n".join(lines)
+
+
 def _build_a_share_ohlcv_block(
     symbol: str,
     start_date: str,
@@ -187,6 +216,8 @@ def get_a_share_stock_data(
 ) -> str:
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
+    if is_hk_ticker(symbol):
+        return _build_hk_ohlcv_block(symbol, start_date, end_date)
     # ``end_date`` from the LLM may lag; always anchor freshness on ``end_date`` as trade_date.
     return _build_a_share_ohlcv_block(symbol, start_date, end_date, use_cache=True)
 
@@ -197,19 +228,31 @@ def get_a_share_indicators(
     curr_date: Annotated[str, "trade date YYYY-mm-dd"],
     look_back_days: Annotated[int, "lookback days"],
 ) -> str:
-    code6 = normalize_a_share_code(symbol)
-    tech = _TECH_MAP.get(indicator, "MACD,RSI,BOLL,MA")
-    count = max(look_back_days + 30, 120)
+    if is_hk_ticker(symbol):
+        count = max(look_back_days + 30, 120)
+        ok, raw, data = run_script(
+            "fetch_hk_data.py",
+            ["--symbol", symbol, "--indicators", "--lookback", str(count)],
+            timeout=35,
+        )
+        if not ok or not isinstance(data, dict):
+            return raw or f"No indicator data for HK symbol '{symbol}'"
+        rows = data.get("indicators") or []
+        code6 = symbol.upper()
+    else:
+        code6 = normalize_a_share_code(symbol)
+        tech = _TECH_MAP.get(indicator, "MACD,RSI,BOLL,MA")
+        count = max(look_back_days + 30, 120)
 
-    ok, raw, rows = run_script(
-        "fetch_technical.py",
-        [code6, "--freq", "1d", "--count", str(count), "--indicators", tech, "--json"],
-        timeout=40,
-    )
-    if not ok:
-        return raw
-    if not isinstance(rows, list) or not rows:
-        return f"No indicator data for {code6} on {curr_date}"
+        ok, raw, rows = run_script(
+            "fetch_technical.py",
+            [code6, "--freq", "1d", "--count", str(count), "--indicators", tech, "--json"],
+            timeout=40,
+        )
+        if not ok:
+            return raw
+        if not isinstance(rows, list) or not rows:
+            return f"No indicator data for {code6} on {curr_date}"
 
     end_date = cn_indicator_end_date(curr_date)
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
@@ -276,6 +319,33 @@ def get_a_share_news(
     start_date: Annotated[str, "start yyyy-mm-dd"],
     end_date: Annotated[str, "end yyyy-mm-dd"],
 ) -> str:
+    if is_hk_ticker(ticker):
+        ok, raw, data = run_script(
+            "fetch_hk_data.py",
+            ["--symbol", ticker, "--news"],
+            timeout=35,
+        )
+        if not ok or not isinstance(data, dict):
+            return raw or f"No news found for HK symbol '{ticker}'"
+        news = data.get("news") or []
+        if not news:
+            return f"No news articles found for HK symbol '{ticker}'"
+            
+        lines = [
+            f"## {ticker.upper()} 新闻与公告 ({start_date} 至 {end_date})",
+            "",
+        ]
+        for rec in news[:15]:
+            title = rec.get("title") or ""
+            pub = rec.get("pub_date") or ""
+            src = rec.get("source") or ""
+            summary = rec.get("content") or ""
+            lines.append(f"### {title} ({pub}) [{src}]")
+            if summary:
+                lines.append(str(summary)[:500])
+            lines.append("")
+        return "\n".join(lines).strip()
+
     from tradingagents.dataflows.cn_prefetch import get_prefetched
 
     code6 = normalize_a_share_code(ticker)
@@ -359,6 +429,50 @@ def get_a_share_fundamentals(
     symbol: Annotated[str, "ticker"],
     curr_date: Annotated[str, "reference date"],
 ) -> str:
+    if is_hk_ticker(symbol):
+        cache_key = (symbol.upper(), str(curr_date))
+        if cache_key in _fundamentals_cache:
+            return _fundamentals_cache[cache_key]
+
+        ok, raw, data = run_script(
+            "fetch_hk_data.py",
+            ["--symbol", symbol, "--fundamentals"],
+            timeout=35,
+        )
+        if not ok or not isinstance(data, dict):
+            return raw or f"No fundamentals found for HK symbol '{symbol}'"
+        fund = data.get("fundamentals") or {}
+        if not fund:
+            return f"No fundamentals records found for HK symbol '{symbol}'"
+            
+        lines = [
+            f"## HK Stock Fundamentals: {fund.get('name', 'N/A')} ({symbol.upper()})",
+            f"Current Price: {fund.get('price', 'N/A')} {fund.get('currency', 'HKD')}",
+            f"Market Cap: {fund.get('market_cap', 'N/A'):,}" if fund.get("market_cap") else "Market Cap: N/A",
+            f"PE Ratio (TTM): {fund.get('pe_ratio', 'N/A')}",
+            f"PB Ratio: {fund.get('pb_ratio', 'N/A')}",
+            "",
+            "### Multi-Year Core Financial Indicators",
+            "| Reporting Date | EPS (HKD) | Revenue (HKD) | Revenue YoY (%) | Gross Margin % | Net Income (HKD) | Net Income YoY (%) | ROE (%) | Debt/Asset Ratio (%) | Current Ratio |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+        ]
+        for row in fund.get("financials", []):
+            lines.append(
+                f"| {row.get('date', 'N/A')} "
+                f"| {row.get('eps', 'N/A')} "
+                f"| {row.get('revenue', 0):,} "
+                f"| {row.get('revenue_yoy', 'N/A')} "
+                f"| {row.get('gross_margin', 'N/A')} "
+                f"| {row.get('net_income', 0):,} "
+                f"| {row.get('net_income_yoy', 'N/A')} "
+                f"| {row.get('roe', 'N/A')} "
+                f"| {row.get('debt_ratio', 'N/A')} "
+                f"| {row.get('current_ratio', 'N/A')} |"
+            )
+        result = "\n".join(lines)
+        _fundamentals_cache[cache_key] = result
+        return result
+
     code6 = normalize_a_share_code(symbol)
     cache_key = (code6, str(curr_date))
     if cache_key in _fundamentals_cache:

@@ -67,4 +67,17 @@ def effective_market_profile(ticker: str, config: dict) -> str:
 
 def cn_uses_a_share_skill(ticker: str, config: dict) -> bool:
     """True when data tools must use the a-share-data skill (``run.sh``) only."""
+    if is_hk_ticker(ticker):
+        return True
     return effective_market_profile(ticker, config) == "cn"
+
+
+def is_hk_ticker(ticker: str) -> bool:
+    """True when ticker represents a Hong Kong stock, e.g. '0700.HK'."""
+    t = (ticker or "").strip().upper()
+    if t.endswith(".HK"):
+        return True
+    if t.isdigit() and len(t) == 5:
+        return True
+    return False
+
