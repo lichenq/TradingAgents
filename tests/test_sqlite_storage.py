@@ -10,6 +10,9 @@ from tradingagents.graph.storage import (
     get_recommendations_from_sqlite,
     save_backtest_audit,
     query_backtest_audits,
+    query_deep_report,
+    report_has_deep_analysis,
+    build_report_storage_ref,
 )
 
 
@@ -49,7 +52,7 @@ class TestSQLiteStorage(unittest.TestCase):
             "sentiment_report": "sentiment text",
             "news_report": "news text",
             "fundamentals_report": "fundamentals text",
-            "final_trade_decision": "final text rating: Buy",
+            "final_trade_decision": "**Rating**: Buy\n\nSufficient length for deep-report reuse check.",
             "final_trade_decision_rating": "Buy",
             "investment_debate_state": {
                 "bull_history": "bull history text",
@@ -75,6 +78,16 @@ class TestSQLiteStorage(unittest.TestCase):
         self.assertEqual(reports[0]["conservative_history"], "conservative risk text")
         self.assertEqual(reports[0]["neutral_history"], "neutral risk text")
         self.assertEqual(reports[0]["complete_report"], "complete text")
+
+        self.assertTrue(report_has_deep_analysis(reports[0]))
+        loaded = query_deep_report(
+            self.temp_dir.name, "300604", "2026-05-27", db_path=self.db_path
+        )
+        self.assertIsNotNone(loaded)
+        self.assertIn("**Rating**: Buy", loaded["final_trade_decision"])
+        ref = build_report_storage_ref("300604", "2026-05-27")
+        self.assertEqual(ref["source"], "sqlite")
+        self.assertEqual(ref["trade_date"], "2026-05-27")
 
         # 4. Save and query backtest audits
         save_backtest_audit(

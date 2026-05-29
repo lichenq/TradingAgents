@@ -3,6 +3,11 @@ from tradingagents.agents.utils.position_context import get_position_assumption_
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
 
 
+def _safe_report(text: str) -> str:
+    cleaned = (text or "").strip()
+    return cleaned if cleaned else "(This report was not generated or is unavailable for this run. Do NOT assume, fabricate, or speculate on any facts, metrics, or announcements from this category.)"
+
+
 def create_bull_researcher(llm):
     def bull_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
@@ -10,10 +15,10 @@ def create_bull_researcher(llm):
         bull_history = investment_debate_state.get("bull_history", "")
 
         current_response = investment_debate_state.get("current_response", "")
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
+        market_research_report = _safe_report(state["market_report"])
+        sentiment_report = _safe_report(state["sentiment_report"])
+        news_report = _safe_report(state["news_report"])
+        fundamentals_report = _safe_report(state["fundamentals_report"])
         asset_type = state.get("asset_type", "stock")
         target_label = "stock" if asset_type == "stock" else "asset"
         fundamentals_label = (
@@ -26,6 +31,7 @@ def create_bull_researcher(llm):
 
 Key points to focus on:
 - Preemptive Causal Clues (蛛丝马迹的先导推演): Actively search the analyst reports (fundamentals, news, etc.) for high-credibility preemptive clues like Capex surges, in-process construction (CIP), specialized technical hirings, or macro-to-micro supply-chain bottlenecks where this asset has unique pricing power. Map out the causal chain and transmission lag.
+- Value Chain & Peer Transmission (顺藤摸瓜的价值链与个股联动推演): Examine the upstream/downstream dependencies (value chain) and sector co-movements (peer correlation). Benchmark this company against the '同业对照' (peer valuation) table in the market facts. If peers or the broader sector are rising on high volume or trading at higher relative valuations, argue how sector rotation or supply-chain demand will pull ('顺藤摸瓜') this stock's valuation upward. Identify specific bottleneck links where upstream/downstream trends will directly transmit as positive triggers for this ticker.
 - Source Credibility Integration: Highlight and rely heavily on [L1: Absolute Facts] and [L2: Physical Anomalies] to build your positive thesis. Be transparent about [L3] and [L4] sources, explaining why any L4 market rumors are either aligned with L1/L2 facts or represent early-stage asymmetrical risk-reward opportunities.
 - Growth Potential: Highlight the company's market opportunities, revenue projections, and scalability.
 - Competitive Advantages: Emphasize factors like unique products, strong branding, or dominant market positioning.

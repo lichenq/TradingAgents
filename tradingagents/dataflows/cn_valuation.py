@@ -146,11 +146,60 @@ def _fetch_events_eps(code6: str) -> Optional[Dict[str, Any]]:
     return _parse_events_eps(raw or "")
 
 
-def _peer_codes(config: dict) -> List[str]:
+def _auto_discover_peer_codes(ticker: str, config: dict, limit: int = 4) -> List[str]:
+    """Automatically discover 3-4 top peer stock codes in the same Eastmoney industry sector."""
+    from tradingagents.dataflows.sector_queries import fetch_sector_payload
+    from tradingagents.dataflows.a_share_runner import run_script
+
+    payload = fetch_sector_payload(ticker)
+    if not payload or not isinstance(payload, dict):
+        return []
+    industry = (payload.get("industry") or "").strip()
+    if not industry:
+        return []
+
+    # Map sector/industry name if needed
+    sector_mapping = {
+        "券商信托": "证券",
+        "通讯行业": "通信设备",
+        "通信行业": "通信设备",
+        "消费电子": "元器件",
+        "电机": "电气设备",
+    }
+    resolved_industry = sector_mapping.get(industry, industry)
+
+    ok, raw, board_detail = run_script(
+        "fetch_realtime.py",
+        ["--boards-detail", "--boards-group-key", resolved_industry, "--boards-items-limit", "10", "--json"],
+        timeout=25
+    )
+    if not ok or not isinstance(board_detail, dict):
+        return []
+
+    items = (board_detail.get("data") or {}).get("items") or []
+    peers = []
+    my_code6 = normalize_a_share_code(ticker)
+    for item in items:
+        code = item.get("code") or ""
+        code6 = "".join(ch for ch in code if ch.isdigit())[-6:]
+        if code6 and code6 != my_code6:
+            peers.append(code6)
+            if len(peers) >= limit:
+                break
+    return peers
+
+
+def _peer_codes(config: dict, ticker: str = "") -> List[str]:
     peers = config.get("cn_valuation_peers") or []
     if isinstance(peers, str):
         peers = [p.strip() for p in peers.split(",") if p.strip()]
-    return [normalize_a_share_code(p) for p in peers if p]
+    resolved = [normalize_a_share_code(p) for p in peers if p]
+    if not resolved and ticker:
+        try:
+            resolved = _auto_discover_peer_codes(ticker, config)
+        except Exception as e:
+            logger.warning(f"Failed to auto-discover peers for {ticker}: {e}")
+    return resolved
 
 
 def fetch_cn_valuation_payload(
@@ -163,7 +212,7 @@ def fetch_cn_valuation_payload(
     ok is False when price or pe_ttm cannot be obtained from market data.
     """
     code6 = normalize_a_share_code(ticker)
-    all_codes = [code6, *_peer_codes(config)]
+    all_codes = [code6, *_peer_codes(config, ticker)]
     try:
         quotes = fetch_tencent_valuations(all_codes)
     except Exception as exc:

@@ -321,11 +321,13 @@ def ticker_lookup_variants(ticker: str) -> List[str]:
 def query_report(
     results_dir: str | Path,
     ticker: str,
-    trade_date: str
+    trade_date: str,
+    db_path: Optional[str | Path] = None,
 ) -> Optional[Dict[str, Any]]:
     """Retrieve a single report from SQLite."""
-    init_db(results_dir)
-    db_path = get_db_path(results_dir)
+    resolved_db = _resolve_db(results_dir, db_path)
+    init_db(resolved_db)
+    db_path = resolved_db
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:
@@ -345,18 +347,53 @@ def query_report(
         conn.close()
 
 
+def report_has_deep_analysis(row: Optional[Dict[str, Any]]) -> bool:
+    """True when SQLite holds enough content to reuse a prior deep run."""
+    if not row:
+        return False
+    ftd = (row.get("final_trade_decision") or "").strip()
+    if len(ftd) >= 30:
+        return True
+    complete = (row.get("complete_report") or "").strip()
+    return len(complete) >= 200
+
+
+def build_report_storage_ref(ticker: str, trade_date: str) -> Dict[str, str]:
+    """Stable DB lookup key for recommendations (not filesystem paths)."""
+    return {
+        "source": "sqlite",
+        "ticker": normalize_report_ticker(ticker),
+        "trade_date": str(trade_date).strip()[:10],
+    }
+
+
+def query_deep_report(
+    results_dir: str | Path,
+    ticker: str,
+    trade_date: str,
+    db_path: Optional[str | Path] = None,
+) -> Optional[Dict[str, Any]]:
+    """Load deep analysis from SQLite; returns None if missing or too thin."""
+    row = query_report_flexible(results_dir, ticker, trade_date, db_path=db_path)
+    if not report_has_deep_analysis(row):
+        return None
+    return row
+
+
 def query_report_flexible(
     results_dir: str | Path,
     ticker: str,
     trade_date: str,
+    db_path: Optional[str | Path] = None,
 ) -> Optional[Dict[str, Any]]:
     """Retrieve a report row matching any common ticker alias for the trade date."""
     date_s = str(trade_date).strip()[:10]
     variants = ticker_lookup_variants(ticker)
     if not variants:
         return None
-    init_db(results_dir)
-    db_path = get_db_path(results_dir)
+    resolved_db = _resolve_db(results_dir, db_path)
+    init_db(resolved_db)
+    db_path = resolved_db
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:

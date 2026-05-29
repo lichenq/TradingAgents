@@ -36,6 +36,7 @@ _P_COCT_FUNDAMENTALS_RULES = (
     "   - [L3: Professional Reports] (专业研报): Reputable media (Bloomberg, Reuters, CLS) in-depth coverage, authoritative broker analyst research.\n"
     "   - [L4: Market Rumors] (市场传言): Social media chatter, online forums, unverified rumors (DO NOT use L4 for fundamental causal chain reasoning, only for sentiment references).\n"
     "3. Preemptive Causal Chain of Thought (P-CoCT先导推演): Focus on 'bottleneck assets' and 'irreversible committed costs' (Sunk Costs). Analyze Capex, CIP, long-term prepaid expenses, or R&D deviations. Deduce what future strategic bottlenecks or revaluation events these costly commitments reveal, and analyze the lead-time (时滞) needed for licenses/audits before these bear fruit in earnings.\n"
+    "4. Handling Information Gaps (信息黑盒处理): If these specific Capex/CIP/R&D metrics are not detailed in your prefetch data or tool outputs, do NOT speculate on exact figures. Instead, explicitly flag them as an 'Information Gap' (数据黑盒), and state that the transmission chain cannot be fully verified due to transparency issues, raising the transmission risk (传导风险升高) for the downstream Portfolio Manager.\n"
 )
 
 

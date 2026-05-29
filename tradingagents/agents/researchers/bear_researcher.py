@@ -3,6 +3,11 @@ from tradingagents.agents.utils.position_context import get_position_assumption_
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
 
 
+def _safe_report(text: str) -> str:
+    cleaned = (text or "").strip()
+    return cleaned if cleaned else "(This report was not generated or is unavailable for this run. Do NOT assume, fabricate, or speculate on any facts, metrics, or announcements from this category.)"
+
+
 def create_bear_researcher(llm):
     def bear_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
@@ -10,10 +15,10 @@ def create_bear_researcher(llm):
         bear_history = investment_debate_state.get("bear_history", "")
 
         current_response = investment_debate_state.get("current_response", "")
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
+        market_research_report = _safe_report(state["market_report"])
+        sentiment_report = _safe_report(state["sentiment_report"])
+        news_report = _safe_report(state["news_report"])
+        fundamentals_report = _safe_report(state["fundamentals_report"])
         asset_type = state.get("asset_type", "stock")
         target_label = "stock" if asset_type == "stock" else "asset"
         fundamentals_label = (
@@ -26,6 +31,7 @@ def create_bear_researcher(llm):
 
 Key points to focus on:
 - Fact Credibility Auditing & De-bunking (可信度打假与审计): Critically analyze the bull analyst's arguments. Check if their optimistic projections are built on low-credibility sources like [L4: Market Rumors] (social media chatter, forum leaks) rather than [L1: Absolute Facts] or [L2: Physical Anomalies]. Boldly call out these logical leaps!
+- Value Chain & Peer Transmission Risks (时滞与产业链传导伪命题打假): Attack the bull's '顺藤摸瓜' value-chain or sector-rotation arguments. Use the '同业对照' (peer valuation) table to show if this stock is actually a weaker laggard ('跟风盘') with deteriorating margins compared to industry leaders. Argue that upstream cost surges (e.g. raw material/energy inflation) represent severe cost transmission risk rather than high-margin growth, and highlight downstream customer weakness/demand destruction that will block any positive transmission.
 - Lead-Time & Transmission Lag Obstacles (时滞与传导壁垒): Even if the bull analyst points to a genuine L1/L2 preemptive indicator (like a Capex surge), highlight the extreme physical lead-times, regulatory audits (e.g., FDA, AS9100), and pricing-power constraints that could delay or completely block these investments from turning into net earnings.
 - Risks and Challenges: Highlight factors like market saturation, financial instability, or macroeconomic threats that could hinder the stock's performance.
 - Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning, declining innovation, or threats from competitors.
