@@ -76,20 +76,51 @@ def sanitize_messages_for_llm(messages: List[Any]) -> List[Any]:
     return msgs
 
 
-def get_analyst_thread(state: Dict[str, Any], thread_key: str) -> List[Any]:
+def get_analyst_thread(state: Dict[str, Any], thread_key: str, *, sanitize: bool = True) -> List[Any]:
     threads = state.get("analyst_threads")
-    if isinstance(threads, dict):
+    if isinstance(threads, dict) and thread_key in threads:
         thread = threads.get(thread_key)
         if thread:
-            return sanitize_messages_for_llm(list(thread))
+            return sanitize_messages_for_llm(list(thread)) if sanitize else list(thread)
         return seed_messages(state)
-    return sanitize_messages_for_llm(list(state.get("messages") or []))
+    return sanitize_messages_for_llm(list(state.get("messages") or [])) if sanitize else list(state.get("messages") or [])
 
 
 def analyst_invoke_messages(state: Dict[str, Any], thread_key: Optional[str]) -> List[Any]:
     if thread_key:
         return get_analyst_thread(state, thread_key)
     return sanitize_messages_for_llm(list(state.get("messages") or []))
+
+
+def extract_last_ai_content(state: Dict[str, Any], thread_key: Optional[str]) -> str:
+    """Best-effort report text from the analyst thread's last assistant message."""
+    from langchain_core.messages import AIMessage
+
+    if thread_key:
+        threads = state.get("analyst_threads") or {}
+        thread = list(threads.get(thread_key) or [])
+    else:
+        thread = list(state.get("messages") or [])
+
+    for msg in reversed(thread):
+        if not isinstance(msg, AIMessage):
+            continue
+        content = msg.content
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+        if isinstance(content, list):
+            parts: List[str] = []
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text") or part.get("content") or ""
+                else:
+                    text = str(part)
+                if str(text).strip():
+                    parts.append(str(text).strip())
+            joined = "\n".join(parts).strip()
+            if joined:
+                return joined
+    return ""
 
 
 def analyst_node_return(
@@ -101,15 +132,37 @@ def analyst_node_return(
     report: str,
 ) -> Dict[str, Any]:
     if thread_key:
-        return {"analyst_threads": {thread_key: [message]}, report_key: report}
-    return {"messages": [message], report_key: report}
+        out: Dict[str, Any] = {"analyst_threads": {thread_key: [message]}}
+    else:
+        out = {"messages": [message]}
+    text = (report or "").strip()
+    if text:
+        out[report_key] = text
+    return out
+
+
+def create_analyst_clear_node(thread_key: Optional[str], report_key: str):
+    """Clear analyst context and backfill report from the last assistant turn if missing."""
+
+    clear_fn = create_analyst_msg_clear(thread_key)
+
+    def node(state: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(clear_fn(state))
+        if (state.get(report_key) or "").strip():
+            return out
+        fallback = extract_last_ai_content(state, thread_key)
+        if fallback:
+            out[report_key] = fallback
+        return out
+
+    return node
 
 
 def create_thread_tool_node(tool_node: Any, thread_key: str):
     """Run ToolNode against an isolated analyst thread (parallel mode)."""
 
     def node(state: Dict[str, Any]) -> Dict[str, Any]:
-        thread = get_analyst_thread(state, thread_key)
+        thread = get_analyst_thread(state, thread_key, sanitize=False)
         out = tool_node.invoke({**state, "messages": thread})
         # ToolNode returns incremental tool messages, not the full thread.
         tool_messages = list(out.get("messages") or [])
@@ -149,7 +202,7 @@ def create_analyst_msg_clear(thread_key: Optional[str] = None):
 
 def last_message_in_thread(state: Dict[str, Any], thread_key: str) -> Any:
     threads = state.get("analyst_threads")
-    if isinstance(threads, dict):
+    if isinstance(threads, dict) and thread_key in threads:
         thread = threads.get(thread_key) or []
         if thread:
             return thread[-1]

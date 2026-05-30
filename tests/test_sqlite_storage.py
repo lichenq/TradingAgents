@@ -89,7 +89,41 @@ class TestSQLiteStorage(unittest.TestCase):
         self.assertEqual(ref["source"], "sqlite")
         self.assertEqual(ref["trade_date"], "2026-05-27")
 
-        # 4. Save and query backtest audits
+    def test_sync_analysis_report_sqlite_without_md(self):
+        from tradingagents.graph.report_export import sync_analysis_report_sqlite
+
+        results_dir = Path(self.temp_dir.name)
+        init_db(results_dir)
+        final_state = {
+            "market_report": "market only",
+            "final_trade_decision": "**Rating**: Hold\n\nDebate body for canvas.",
+            "investment_debate_state": {"bull_history": "bull", "bear_history": "bear"},
+            "risk_debate_state": {
+                "aggressive_history": "agg",
+                "conservative_history": "con",
+                "neutral_history": "neu",
+            },
+        }
+        sync_analysis_report_sqlite(
+            final_state,
+            "600110",
+            "2026-05-29",
+            complete_report_text="",
+            results_dir=results_dir,
+        )
+        reports = get_reports_from_sqlite(
+            "sh600110",
+            "2026-05-29",
+            db_path=results_dir / "trading_agents.db",
+        )
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0]["market_report"], "market only")
+        self.assertEqual(reports[0]["complete_report"], "")
+        self.assertIn("Hold", reports[0]["final_trade_decision"])
+
+    def test_backtest_audit_flow(self):
+        init_db(self.db_path)
+        # Save and query backtest audits
         save_backtest_audit(
             results_dir=self.temp_dir.name,
             ticker="sz300604",

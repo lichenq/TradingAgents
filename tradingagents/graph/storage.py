@@ -12,6 +12,21 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def parse_json_safe(text: str) -> Optional[Any]:
+    """Parse JSON text, tolerating trailing garbage from corrupted writes."""
+    if not text or not text.strip():
+        return None
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(text)
+            return obj
+        except json.JSONDecodeError:
+            return None
+
+
 def get_db_path(results_dir: str | Path) -> Path:
     """Return the absolute path to the local SQLite database file."""
     path = Path(results_dir)
@@ -106,6 +121,17 @@ def init_db(results_dir_or_db_path: str | Path) -> None:
                 reflection TEXT,
                 created_at TEXT,
                 UNIQUE(ticker, recommendation_date, days_elapsed)
+            )
+        """)
+
+        # Table: sector_rotation (Sector rotation forecasts & probabilities)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sector_rotation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_date TEXT UNIQUE,
+                report_text TEXT,
+                forecast_json TEXT,
+                created_at TEXT
             )
         """)
         
@@ -444,7 +470,11 @@ def save_report_to_sqlite(
                 break
     final_trade_decision = final_state.get("final_trade_decision") or ""
     investment_plan = final_state.get("investment_plan") or ""
-    trader_investment_plan = final_state.get("trader_investment_plan") or ""
+    trader_investment_plan = (
+        final_state.get("trader_investment_plan")
+        or final_state.get("trader_investment_decision")
+        or ""
+    )
     
     market_report = final_state.get("market_report") or ""
     sentiment_report = final_state.get("sentiment_report") or ""
@@ -633,5 +663,69 @@ def query_backtest_audits(
         return []
     finally:
         conn.close()
+
+
+def save_sector_rotation(
+    results_dir: str | Path,
+    trade_date: str,
+    report_text: str,
+    forecast_json: str,
+    db_path: Optional[str | Path] = None
+) -> None:
+    """Save or update sector rotation forecasts in SQLite."""
+    resolved_db = _resolve_db(results_dir, db_path)
+    init_db(resolved_db)
+    conn = sqlite3.connect(str(resolved_db))
+    try:
+        cursor = conn.cursor()
+        created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        cursor.execute("""
+            INSERT OR REPLACE INTO sector_rotation (
+                trade_date, report_text, forecast_json, created_at
+            ) VALUES (?, ?, ?, ?)
+        """, (trade_date, report_text, forecast_json, created_at))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to save sector rotation to SQLite: {e}")
+    finally:
+        conn.close()
+
+
+def query_sector_rotation(
+    results_dir: str | Path,
+    trade_date: str,
+    db_path: Optional[str | Path] = None
+) -> Optional[Dict[str, Any]]:
+    """Retrieve sector rotation forecast from SQLite for a given trade date."""
+    resolved_db = _resolve_db(results_dir, db_path)
+    init_db(resolved_db)
+    conn = sqlite3.connect(str(resolved_db))
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM sector_rotation WHERE trade_date = ?",
+            (trade_date,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        raw = result.get("forecast_json")
+        if raw:
+            parsed = parse_json_safe(raw)
+            if parsed is not None:
+                result["forecast_json"] = json.dumps(parsed, ensure_ascii=False)
+            else:
+                logger.warning("Sector rotation forecast_json is not valid JSON; omitting")
+                result["forecast_json"] = None
+        return result
+    except Exception as e:
+        logger.error(f"Failed to query sector rotation from SQLite: {e}")
+        return None
+    finally:
+        conn.close()
+
 
 

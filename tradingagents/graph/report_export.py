@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 def save_analysis_report_md(
@@ -128,12 +131,34 @@ def save_analysis_report_md(
     if alias != complete:
         alias.write_text(complete.read_text(encoding="utf-8"), encoding="utf-8")
 
-    # Sync full report into unified local SQLite database
+    return complete
+
+
+def sync_analysis_report_sqlite(
+    final_state: Dict[str, Any],
+    ticker: str,
+    trade_date: str,
+    *,
+    complete_report_text: str = "",
+    results_dir: Optional[Union[str, Path]] = None,
+) -> None:
+    """Persist structured debate fields to SQLite (independent of Markdown export)."""
+    state = dict(final_state)
+    if results_dir is not None:
+        state["results_dir"] = str(results_dir)
     try:
         from tradingagents.graph.storage import save_report_to_sqlite
-        save_report_to_sqlite(final_state, ticker, trade_date, complete_report_text=complete_report_text)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to sync report {ticker} on {trade_date} to SQLite: {e}")
 
-    return complete
+        save_report_to_sqlite(
+            state,
+            ticker,
+            trade_date,
+            complete_report_text=complete_report_text or "",
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to sync report %s on %s to SQLite: %s",
+            ticker,
+            trade_date,
+            e,
+        )

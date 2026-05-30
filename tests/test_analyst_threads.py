@@ -1,82 +1,58 @@
-"""Parallel analyst message thread helpers."""
-
 import unittest
-from unittest.mock import MagicMock
 
 from langchain_core.messages import AIMessage, HumanMessage
 
 from tradingagents.agents.utils.analyst_threads import (
-    get_analyst_thread,
-    last_message_in_thread,
-    merge_analyst_threads,
-    sanitize_messages_for_llm,
-    tool_names_from_update,
+    analyst_node_return,
+    create_analyst_clear_node,
+    extract_last_ai_content,
 )
-from langchain_core.messages import HumanMessage, ToolMessage
 
 
-class TestAnalystThreads(unittest.TestCase):
-    def test_merge_threads(self):
-        a = merge_analyst_threads({"market": [HumanMessage(content="a")]}, {"market": [AIMessage(content="b")]})
-        self.assertEqual(len(a["market"]), 2)
+class AnalystThreadTests(unittest.TestCase):
+    def test_analyst_node_return_skips_empty_report(self):
+        msg = AIMessage(content="tool round", tool_calls=[{"id": "1", "name": "get_stock_data", "args": {}}])
+        out = analyst_node_return(
+            {"messages": []},
+            thread_key=None,
+            message=msg,
+            report_key="market_report",
+            report="",
+        )
+        self.assertNotIn("market_report", out)
 
-    def test_seed_from_human(self):
-        state = {"messages": [HumanMessage(content="688981.SS")]}
-        thread = get_analyst_thread(state, "fundamentals")
-        self.assertEqual(len(thread), 1)
+        final = analyst_node_return(
+            {"messages": []},
+            thread_key=None,
+            message=AIMessage(content="final market report"),
+            report_key="market_report",
+            report="final market report",
+        )
+        self.assertEqual(final["market_report"], "final market report")
 
-    def test_last_message_prefers_thread(self):
-        msg = AIMessage(content="x", tool_calls=[{"name": "get_fundamentals", "args": {}, "id": "1"}])
+    def test_clear_node_backfills_report_from_thread(self):
         state = {
-            "messages": [HumanMessage(content="ticker")],
-            "analyst_threads": {"fundamentals": [msg]},
+            "market_report": "",
+            "analyst_threads": {
+                "market": [
+                    HumanMessage(content="Continue"),
+                    AIMessage(content="draft with tools", tool_calls=[{"id": "1", "name": "x", "args": {}}]),
+                    AIMessage(content="## 技术面结论\n趋势向上"),
+                ]
+            },
         }
-        last = last_message_in_thread(state, "fundamentals")
-        self.assertTrue(last.tool_calls)
+        clear = create_analyst_clear_node("market", "market_report")
+        out = clear(state)
+        self.assertIn("技术面结论", out.get("market_report", ""))
 
-    def test_merge_reset_replaces_thread(self):
-        old = {"market": [HumanMessage(content="a"), HumanMessage(content="b")]}
-        new = {"market": [HumanMessage(content="Continue")]}
-        merged = merge_analyst_threads(old, new)
-        self.assertEqual(len(merged["market"]), 1)
-        self.assertEqual(merged["market"][0].content, "Continue")
-
-    def test_tool_names_from_threads(self):
-        msg = MagicMock()
-        msg.tool_calls = [{"name": "get_stock_data"}]
-        names = tool_names_from_update({"analyst_threads": {"market": [msg]}})
-        self.assertEqual(names, ["get_stock_data"])
-
-    def test_sanitize_drops_orphan_tool_calls(self):
-        ai = AIMessage(
-            content="",
-            tool_calls=[{"name": "get_fundamentals", "args": {}, "id": "tc1"}],
-        )
-        cleaned = sanitize_messages_for_llm([HumanMessage(content="002594.SZ"), ai])
-        self.assertEqual(len(cleaned), 1)
-
-    def test_sanitize_keeps_complete_tool_round(self):
-        ai = AIMessage(
-            content="",
-            tool_calls=[{"name": "get_fundamentals", "args": {}, "id": "tc1"}],
-        )
-        tool = ToolMessage(content="ok", tool_call_id="tc1")
-        cleaned = sanitize_messages_for_llm(
-            [HumanMessage(content="002594.SZ"), ai, tool]
-        )
-        self.assertEqual(len(cleaned), 3)
-
-    def test_parallel_last_message_uses_seed_not_global(self):
-        ai = AIMessage(
-            content="",
-            tool_calls=[{"name": "get_news", "args": {}, "id": "x"}],
-        )
+    def test_extract_last_ai_content_from_messages(self):
         state = {
-            "messages": [HumanMessage(content="002594.SZ"), ai],
-            "analyst_threads": {"fundamentals": []},
+            "messages": [
+                HumanMessage(content="Continue"),
+                AIMessage(content="news summary body"),
+            ]
         }
-        last = last_message_in_thread(state, "fundamentals")
-        self.assertEqual(last.content, "002594.SZ")
+        self.assertEqual(extract_last_ai_content(state, None), "news summary body")
 
 
 if __name__ == "__main__":

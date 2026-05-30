@@ -196,7 +196,11 @@ def build_save_report_args(
     risk = _risk_histories_from_bundle(bundle_dir, data)
     if data:
         debate = data.get("investment_debate_state") or {}
-        trader_plan = data.get("trader_investment_plan") or _read(bundle_dir / "3_trading" / "trader.md")
+        trader_plan = (
+            data.get("trader_investment_plan")
+            or data.get("trader_investment_decision")
+            or _read(bundle_dir / "3_trading" / "trader.md")
+        )
         rating = (data.get("final_trade_decision_rating") or "").strip()
         if not rating:
             rating = _rating_from_final_decision(data.get("final_trade_decision") or "")

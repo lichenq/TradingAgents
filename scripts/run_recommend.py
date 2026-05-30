@@ -627,6 +627,11 @@ def main() -> int:
         action="store_true",
         help="Re-run Stage-2 deep analysis even when SQLite already has a report for that ticker+date",
     )
+    parser.add_argument(
+        "--md",
+        action="store_true",
+        help="Whether to compile and save the Markdown report (default: False)"
+    )
     args = parser.parse_args()
 
     if args.concurrency > 3:
@@ -649,6 +654,7 @@ def main() -> int:
     # 1. Resolve date
     with prog.stage("解析交易日"):
         config = DEFAULT_CONFIG.copy()
+        config["save_md"] = args.md
         init_db(config["results_dir"])
         trade_date = args.date.strip() or resolve_default_trade_date("600519", config)
         prog.step(f"trade_date={trade_date}")
@@ -1054,84 +1060,88 @@ def main() -> int:
         except Exception as e:
             logger.warning(f"Failed to sync recommendations to SQLite: {e}")
 
-        md_lines = [
-            "#  TradingAgents 每日 A 股量化精选推荐报告",
-            "",
-            f"- **分析日期**: `{trade_date}`",
-            f"- **筛选量化策略**: `{args.strategy}` (共初筛 `{len(shortlist)}` 只股票，通过红线过滤 `{len(valid_shortlist)}` 只)",
-            f"- **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            "",
-            "##  股票池精选结果摘要 (Shortlist Summary)",
-            "",
-            "| 股票代码 | 股票名称 | 量化分值 | 最新现价 | 智能体决策级 | 核心推荐驱动力 |",
-            "|---|---|---|---|---|---|",
-        ]
-
-        for r in recommended_stocks:
-            code6 = r["code"][-6:]
-            md_lines.append(
-                f"| `{code6}` | **{r['name']}** | {r['score']:.1f} | {r['price']:.2f} 元 | "
-                f"**{r['rating']}** | {r['reason'][:40]}... |"
-            )
-        if not recommended_stocks:
-            md_lines.append("| (今日无推荐股票) | - | - | - | - | - |")
-
-        md_lines.extend([
-            "",
-            "##  多智能体深度研判详情 (Deep Agent Valuations)",
-            "",
-        ])
-
-        for r in recommended_stocks:
-            code6 = r["code"][-6:]
-            md_lines.extend([
-                f"### {r['name']} ({code6}) — 智能体评级: **{r['rating']}**",
+        if args.md:
+            md_lines = [
+                "#  TradingAgents 每日 A 股量化精选推荐报告",
                 "",
-                f"- **初筛现价**: `{r['price']:.2f} 元` | **量化技术形态得分**: `{r['score']:.1f}`",
-                f"- **技术筛理由**: {r['reason']}",
+                f"- **分析日期**: `{trade_date}`",
+                f"- **筛选量化策略**: `{args.strategy}` (共初筛 `{len(shortlist)}` 只股票，通过红线过滤 `{len(valid_shortlist)}` 只)",
+                f"- **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                "",
+                "##  股票池精选结果摘要 (Shortlist Summary)",
+                "",
+                "| 股票代码 | 股票名称 | 量化分值 | 最新现价 | 智能体决策级 | 核心推荐驱动力 |",
+                "|---|---|---|---|---|---|",
+            ]
+
+            for r in recommended_stocks:
+                code6 = r["code"][-6:]
+                md_lines.append(
+                    f"| `{code6}` | **{r['name']}** | {r['score']:.1f} | {r['price']:.2f} 元 | "
+                    f"**{r['rating']}** | {r['reason'][:40]}... |"
+                )
+            if not recommended_stocks:
+                md_lines.append("| (今日无推荐股票) | - | - | - | - | - |")
+
+            md_lines.extend([
+                "",
+                "##  多智能体深度研判详情 (Deep Agent Valuations)",
                 "",
             ])
 
-            final_state_data = r.get("final_state", {})
-            decision_text = final_state_data.get("final_trade_decision") or ""
-
-            if decision_text:
-                clean_decision = re.sub(r"^#+.*", "", decision_text, flags=re.MULTILINE).strip()
+            for r in recommended_stocks:
+                code6 = r["code"][-6:]
                 md_lines.extend([
-                    "####  组合经理与风控最终决策",
+                    f"### {r['name']} ({code6}) — 智能体评级: **{r['rating']}**",
                     "",
-                    clean_decision,
+                    f"- **初筛现价**: `{r['price']:.2f} 元` | **量化技术形态得分**: `{r['score']:.1f}`",
+                    f"- **技术筛理由**: {r['reason']}",
                     "",
                 ])
-            else:
-                md_lines.append("*（多智能体报告未成功生成或该股票未给出有效决策内容）*")
+
+                final_state_data = r.get("final_state", {})
+                decision_text = final_state_data.get("final_trade_decision") or ""
+
+                if decision_text:
+                    clean_decision = re.sub(r"^#+.*", "", decision_text, flags=re.MULTILINE).strip()
+                    md_lines.extend([
+                        "####  组合经理与风控最终决策",
+                        "",
+                        clean_decision,
+                        "",
+                    ])
+                else:
+                    md_lines.append("*（多智能体报告未成功生成或该股票未给出有效决策内容）*")
+                    md_lines.append("")
+
+            if pruned_list:
+                md_lines.extend([
+                    "---",
+                    "## ⚠️ 动态防爆雷红线拦截详情 (Risk-Mitigated Pruning History)",
+                    "",
+                    "以下股票虽具有完美的技术买入形态，但触发了基本面亏损或重大合规、监管和暴雷风险红线，被系统一票否决：",
+                    "",
+                    "| 股票代码 | 股票名称 | 技术得分 | 红线拦截理由 |",
+                    "|---|---|---|---|",
+                ])
+                for p in pruned_list:
+                    md_lines.append(
+                        f"| `{p['code'][-6:]}` | {p['name']} | {p['score']:.1f} | **{p.get('prune_reason')}** |"
+                    )
                 md_lines.append("")
 
-        if pruned_list:
-            md_lines.extend([
-                "---",
-                "## ⚠️ 动态防爆雷红线拦截详情 (Risk-Mitigated Pruning History)",
-                "",
-                "以下股票虽具有完美的技术买入形态，但触发了基本面亏损或重大合规、监管和暴雷风险红线，被系统一票否决：",
-                "",
-                "| 股票代码 | 股票名称 | 技术得分 | 红线拦截理由 |",
-                "|---|---|---|---|",
-            ])
-            for p in pruned_list:
-                md_lines.append(
-                    f"| `{p['code'][-6:]}` | {p['name']} | {p['score']:.1f} | **{p.get('prune_reason')}** |"
-                )
-            md_lines.append("")
-
-        report_path.write_text("\n".join(md_lines), encoding="utf-8")
-        prog.step(f"Markdown → {report_path}")
+            report_path.write_text("\n".join(md_lines), encoding="utf-8")
+            prog.step(f"Markdown → {report_path}")
+        else:
+            prog.step("Markdown report skipped (run with --md to enable)")
 
     prog.finish_pipeline()
 
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     else:
-        print(f"\nRecommended report: {report_path.resolve()}")
+        if args.md:
+            print(f"\nRecommended report: {report_path.resolve()}")
         print("Recommended stocks:")
         for r in recommended_stocks:
             print(f"  - {r['name']} ({r['code'][-6:]}): Rating={r['rating']}, Score={r['score']:.1f}")

@@ -51,7 +51,7 @@ from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
 from .progress_log import GraphProgressLogger, progress_logging_enabled
-from .report_export import save_analysis_report_md
+from .report_export import save_analysis_report_md, sync_analysis_report_sqlite
 
 
 class TradingAgentsGraph:
@@ -525,14 +525,27 @@ class TradingAgentsGraph:
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(self.log_states_dict[str(trade_date)], f, indent=4)
 
-        md_path = save_analysis_report_md(
+        complete_report_text = ""
+        md_path = None
+        if self.config.get("save_md", True):
+            md_path = save_analysis_report_md(
+                final_state,
+                self.ticker,
+                bundle,
+                trade_date=str(trade_date),
+                stock_name=resolve_stock_display_name(self.ticker),
+            )
+            logger.info("Markdown report written to %s", md_path)
+            if md_path and md_path.is_file():
+                complete_report_text = md_path.read_text(encoding="utf-8")
+
+        sync_analysis_report_sqlite(
             final_state,
             self.ticker,
-            bundle,
-            trade_date=str(trade_date),
-            stock_name=resolve_stock_display_name(self.ticker),
+            str(trade_date),
+            complete_report_text=complete_report_text,
+            results_dir=self.config["results_dir"],
         )
-        logger.info("Markdown report written to %s", md_path)
         return md_path
 
     def process_signal(self, full_signal):

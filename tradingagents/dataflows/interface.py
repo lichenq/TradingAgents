@@ -37,7 +37,10 @@ from .alpha_vantage_common import AlphaVantageRateLimitError
 
 # Configuration and routing logic
 from .config import get_config
-from tradingagents.market import cn_uses_a_share_skill, effective_market_profile
+from tradingagents.market import (
+    cn_uses_a_share_skill,
+    effective_market_profile,
+)
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
@@ -169,9 +172,17 @@ def route_to_vendor(method: str, *args, **kwargs):
     all_available_vendors = list(VENDOR_METHODS[method].keys())
     fallback_vendors = primary_vendors.copy()
 
+    market = effective_market_profile(str(ticker_hint), cfg)
     if cn_uses_a_share_skill(str(ticker_hint), cfg):
         # China A-shares: a-share-data skill only (see tradingagents/dataflows/a_share_runner.py).
         fallback_vendors = ["a_share"] if "a_share" in VENDOR_METHODS[method] else primary_vendors
+    elif market == "us":
+        # US equities: Alpha Vantage only (no Yahoo/yfinance fallback).
+        fallback_vendors = (
+            ["alpha_vantage"]
+            if "alpha_vantage" in VENDOR_METHODS[method]
+            else primary_vendors
+        )
     else:
         for vendor in all_available_vendors:
             if vendor not in fallback_vendors:

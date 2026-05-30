@@ -7,7 +7,7 @@ from langgraph.prebuilt import ToolNode
 from tradingagents.agents import *
 from tradingagents.agents.utils.agent_states import AgentState
 
-from tradingagents.agents.utils.analyst_threads import create_thread_tool_node
+from tradingagents.agents.utils.analyst_threads import create_thread_tool_node, create_analyst_clear_node
 
 from .analyst_execution import build_analyst_execution_plan
 from .analyst_join import ANALYST_JOIN_NODE, analysts_join_node
@@ -90,7 +90,7 @@ class GraphSetup:
         for spec in plan.specs:
             thread_key = spec.key if parallel_analysts else None
             workflow.add_node(spec.agent_node, analyst_factories[spec.key](thread_key))
-            workflow.add_node(spec.clear_node, create_msg_delete(thread_key))
+            workflow.add_node(spec.clear_node, create_analyst_clear_node(thread_key, spec.report_key))
             tool_node = self.tool_nodes[spec.key]
             if parallel_analysts:
                 tool_node = create_thread_tool_node(tool_node, spec.key)

@@ -30,11 +30,13 @@ def create_bull_researcher(llm):
         prompt = f"""You are a Bull Analyst advocating for investing in the {target_label}. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively.
 
 Key points to focus on:
-- Preemptive Causal Clues (蛛丝马迹的先导推演): Actively search the analyst reports (fundamentals, news, etc.) for high-credibility preemptive clues like Capex surges, in-process construction (CIP), specialized technical hirings, or macro-to-micro supply-chain bottlenecks where this asset has unique pricing power. Map out the causal chain and transmission lag.
-- Value Chain & Peer Transmission (顺藤摸瓜的价值链与个股联动推演): Examine the upstream/downstream dependencies (value chain) and sector co-movements (peer correlation). Benchmark this company against the '同业对照' (peer valuation) table in the market facts. If peers or the broader sector are rising on high volume or trading at higher relative valuations, argue how sector rotation or supply-chain demand will pull ('顺藤摸瓜') this stock's valuation upward. Identify specific bottleneck links where upstream/downstream trends will directly transmit as positive triggers for this ticker.
-- Source Credibility Integration: Highlight and rely heavily on [L1: Absolute Facts] and [L2: Physical Anomalies] to build your positive thesis. Be transparent about [L3] and [L4] sources, explaining why any L4 market rumors are either aligned with L1/L2 facts or represent early-stage asymmetrical risk-reward opportunities.
-- Growth Potential: Highlight the company's market opportunities, revenue projections, and scalability.
-- Competitive Advantages: Emphasize factors like unique products, strong branding, or dominant market positioning.
+- Preemptive Causal Clues & Chokepoint Identification (卡脖子瓶颈与蛛丝马迹的先导推演): Actively apply Serenity's "Chokepoint Theory". Search the analyst reports and fundamentals for niche, irreplaceable upstream physical bottlenecks (e.g. rare raw materials, specialized substrates like InP, specific testing equipment, or precision packaging technologies) that downstream giants must rely on. Map out the causal chain and transmission lag.
+- Serenity Evidence Pyramid (Serenity 证据金字塔约束): Restrict your arguments strictly to high-credibility sources:
+  * [S-Tier / L1]: SEC financial reports, official corporate announcements, management minutes, QVL certification lists.
+  * [A-Tier / L2 (Physical Anomalies)]: Specialized job hiring spikes (e.g. advanced packaging engineers), new patent publications, peer Capex expansion, state CHIPS Act funding.
+  * Clearly label any [L3/L4] rumors or model extrapolations and explain how they link to L1/L2 hard facts.
+- Value Chain & Peer Transmission (顺藤摸瓜的价值链与个股联动推演): Benchmark this company against the '同业对照' (peer valuation) table. If peers or the broader sector are rising on high volume, argue how sector rotation or supply-chain demand will pull ('顺藤摸瓜') this stock's valuation upward. Identify specific bottleneck links where upstream/downstream trends will directly transmit as positive triggers.
+- Growth Potential & Competitive Advantages: Highlight market opportunities, unique technologies, pricing power, high switching costs, and gross margin resilience.
 - Bear Counterpoints: Critically analyze the bear argument with specific data and sound reasoning, addressing concerns thoroughly and showing why the bull perspective holds stronger merit.
 - Engagement: Present your argument in a conversational style, engaging directly with the bear analyst's points and debating effectively rather than just listing data.
 

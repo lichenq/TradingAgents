@@ -214,7 +214,7 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "max_recur_limit": 100,
     # >1 runs market/sentiment/news/fundamentals in parallel (LangGraph fan-out).
     # Use 1 until parallel join/debate reducers are fully battle-tested.
-    "analyst_concurrency_limit": 1,
+    "analyst_concurrency_limit": 4,
     # Print stage-by-stage progress to stderr during propagate (off: TRADINGAGENTS_PROGRESS_LOG=0)
     "progress_logging": True,
     # News / data fetching parameters
@@ -232,13 +232,13 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
         "ECB Bank of England BOJ central bank policy",
         "oil commodities supply chain energy",
     ],
-    # Data vendor configuration
-    # Category-level configuration (default for all tools in category)
+    # Data vendor configuration (US / non-CN tickers; CN overrides via apply_market_profile)
+    # Requires ALPHA_VANTAGE_API_KEY in .env — no Yahoo/yfinance fallback for US routes.
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "core_stock_apis": "alpha_vantage",
+        "technical_indicators": "alpha_vantage",
+        "fundamental_data": "alpha_vantage",
+        "news_data": "alpha_vantage",
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
