@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Non-interactive stock recommendation system for TradingAgents (Stage 1 Screener + Stage 2 Deep Validation)."""
+"""Non-interactive stock recommendation (Stage 1 screen → Stage 2 deep analyze → Stage 3 read reports & curate)."""
 
 from __future__ import annotations
 
@@ -35,6 +35,11 @@ from tradingagents.graph.storage import (
     build_report_storage_ref,
     init_db,
     query_deep_report,
+    query_report_flexible,
+)
+from tradingagents.recommend.portfolio_curator import (
+    curate_final_recommendations,
+    resolve_complete_report_text,
 )
 from tradingagents.agents.utils.rating import parse_rating
 from tradingagents.dataflows.a_share_runner import run_script
@@ -541,9 +546,20 @@ def run_multi_agent_graph(
         final_state, decision = graph.propagate(code, trade_date)
 
         item["rating"] = decision
+        complete_report = ""
+        row = query_report_flexible(results_dir, code, trade_date)
+        if row:
+            complete_report = (row.get("complete_report") or "").strip()
+        if not complete_report:
+            complete_report = resolve_complete_report_text(
+                {"code": code, "final_state": final_state},
+                results_dir,
+                trade_date,
+            )
         item["final_state"] = {
             "final_trade_decision": final_state.get("final_trade_decision") or "",
             "investment_plan": final_state.get("investment_plan") or "",
+            "complete_report": complete_report,
         }
         ref = build_report_storage_ref(code, trade_date)
         item["report_storage"] = ref
@@ -631,6 +647,11 @@ def main() -> int:
         "--md",
         action="store_true",
         help="Whether to compile and save the Markdown report (default: False)"
+    )
+    parser.add_argument(
+        "--skip-curation",
+        action="store_true",
+        help="Skip Stage-3 LLM report reading (legacy rating-only filter)",
     )
     args = parser.parse_args()
 
@@ -985,25 +1006,34 @@ def main() -> int:
             prog.step("无候选股，跳过深度研判")
 
     # =====================================================================
-    # STAGE 3: Portfolio Ranking & Final Report Generation
+    # STAGE 3: Read full reports → curate final list → export
     # =====================================================================
+    skip_curation = args.skip_curation or os.environ.get(
+        "TRADINGAGENTS_RECOMMEND_SKIP_CURATION", ""
+    ).strip().lower() in ("1", "true", "yes", "on")
+    curation_meta: Dict[str, Any] = {}
+
     with prog.stage(
-        "Stage3 报告生成",
+        "Stage3 读报告精选",
         lambda: f"推荐 {len(recommended_stocks)} 只",
     ):
-        rating_priority = {"Buy": 1, "Overweight": 2, "Hold": 3, "Sell": 4, "FAILED": 5}
-        validated_results.sort(
-            key=lambda x: (
-                rating_priority.get(x.get("rating", "FAILED"), 5),
-                -x["score"],
-            )
+        recommended_stocks, curation_meta = curate_final_recommendations(
+            validated_results,
+            config,
+            trade_date,
+            skip=skip_curation,
         )
-
-        recommended_stocks = [
-            r
-            for r in validated_results
-            if r.get("rating") in ["Buy", "Overweight", "Hold"]
-        ]
+        if curation_meta.get("method") == "llm":
+            prog.step(
+                f"已阅读完整报告并精选 {len(recommended_stocks)} 只 "
+                f"({curation_meta.get('portfolio_summary', '')[:80]})"
+            )
+        elif skip_curation:
+            prog.step("已跳过 Stage-3 读报告精选 (--skip-curation)")
+        else:
+            prog.step(
+                f"精选方式: {curation_meta.get('method', 'legacy')} → {len(recommended_stocks)} 只"
+            )
 
         rec_dir = Path(config["results_dir"]) / "recommendations" / trade_date
         rec_dir.mkdir(parents=True, exist_ok=True)
@@ -1014,10 +1044,12 @@ def main() -> int:
         summary = {
             "trade_date": trade_date,
             "strategy": args.strategy,
+            "curation": curation_meta,
             "parameters": {
                 "top_n": args.top_n,
                 "validate_top": args.validate_top,
                 "min_volume_amount": args.min_volume_amount,
+                "skip_curation": skip_curation,
             },
             "all_screened_count": len(shortlist),
             "pruned": [
@@ -1042,6 +1074,8 @@ def main() -> int:
                     "report_storage": r.get("report_storage", r.get("report_paths", {})),
                     "deep_analysis_source": r.get("deep_analysis_source"),
                     "skipped_deep_analysis": r.get("skipped_deep_analysis", False),
+                    "curation_reviewed": r.get("curation_reviewed", False),
+                    "curation_evidence": r.get("curation_evidence", ""),
                 }
                 for r in recommended_stocks
             ],
@@ -1101,6 +1135,15 @@ def main() -> int:
 
                 final_state_data = r.get("final_state", {})
                 decision_text = final_state_data.get("final_trade_decision") or ""
+
+                curation_note = r.get("curation_evidence") or ""
+                if curation_note:
+                    md_lines.extend([
+                        "####  Stage-3 读报告精选依据",
+                        "",
+                        curation_note,
+                        "",
+                    ])
 
                 if decision_text:
                     clean_decision = re.sub(r"^#+.*", "", decision_text, flags=re.MULTILINE).strip()
