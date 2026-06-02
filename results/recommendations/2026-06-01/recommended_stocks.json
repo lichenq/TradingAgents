@@ -1,0 +1,52 @@
+{
+  "trade_date": "2026-06-01",
+  "strategy": "trend_pullback",
+  "curation": {
+    "skipped": false,
+    "method": "llm",
+    "portfolio_summary": "2026年6月1日，五只候选标的全面呈现技术性破位信号——MACD死叉、均线空头排列、高位天量派发、波动率极端放大等风险信号高度共振。澜起科技（688008）基本面最优但技术面待修复，拓荆科技（688072）中期结构未完全破坏但大基金减持压制，沪硅产业（688126）持续亏损叠加减持属最弱标的。所有候选股的市场分析师、情绪分析师、新闻分析师三方报告均指向观望等待，无一满足\"可操作暴露\"的建仓条件。今日推荐空仓，等待市场企稳信号出现后再评估入场时机。",
+    "selected_count": 0,
+    "intentional_empty": true
+  },
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 5,
+    "min_volume_amount": 50000000.0,
+    "skip_curation": false
+  },
+  "all_screened_count": 27,
+  "pruned": [],
+  "recommendations": [],
+  "watchlist_after_deep_review": [
+    {
+      "code": "sz688008",
+      "name": "澜起科技",
+      "stage2_rating": "Overweight",
+      "note": "基本面强但 MACD 转负、跌破 MA50/200；PM 建议 235–242 元小仓试探，非收盘追价"
+    },
+    {
+      "code": "sz000021",
+      "name": "深科技",
+      "stage2_rating": "Overweight",
+      "note": "等布林中轨约 37 元缩量企稳；天量后空头排列未逆转，硬止损 34 元"
+    },
+    {
+      "code": "sh688126",
+      "name": "沪硅产业",
+      "stage2_rating": "Hold",
+      "note": "大基金+高管减持、持续亏损；PM 明确观望不开仓"
+    },
+    {
+      "code": "sh688072",
+      "name": "拓荆科技",
+      "stage2_rating": "Sell",
+      "note": "大基金减持 + TTM PE>40× 双红线，回避"
+    },
+    {
+      "code": "sz002281",
+      "name": "光迅科技",
+      "stage2_rating": "Underweight",
+      "note": "TTM PE 160× 估值熔断，需回落至 140–160 元再评估"
+    }
+  ]
+}
