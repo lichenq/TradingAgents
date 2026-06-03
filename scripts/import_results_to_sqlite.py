@@ -252,6 +252,80 @@ def iter_complete_reports(results_root: Path) -> List[Path]:
     return sorted(out)
 
 
+def _complete_report_from_state(data: Dict[str, Any]) -> str:
+    ftd = (data.get("final_trade_decision") or "").strip()
+    if len(ftd) >= 30:
+        return ftd
+    chunks = [
+        data.get("market_report") or "",
+        data.get("sentiment_report") or "",
+        data.get("news_report") or "",
+        data.get("fundamentals_report") or "",
+        data.get("investment_plan") or "",
+    ]
+    text = "\n\n".join(c for c in chunks if c.strip())
+    return text.strip()
+
+
+def iter_json_only_bundles(results_root: Path) -> List[Path]:
+    """Bundle dirs with state JSON but no complete_report.md (common for JSON-only runs)."""
+    skip_names = {"recommendations", "boards"}
+    out: List[Path] = []
+    if not results_root.is_dir():
+        return out
+    for child in sorted(results_root.iterdir()):
+        if not child.is_dir() or child.name in skip_names or child.name.startswith("."):
+            continue
+        if not parse_bundle_dir_name(child.name):
+            continue
+        if (child / "complete_report.md").is_file():
+            continue
+        if find_state_json(child):
+            out.append(child)
+    return out
+
+
+def import_one_json_bundle(
+    bundle_dir: Path,
+    results_root: Path,
+    *,
+    dry_run: bool,
+    skip_existing: bool,
+) -> str:
+    jpath = find_state_json(bundle_dir)
+    if not jpath:
+        return "skip_empty"
+    data = load_state_json(jpath)
+    if not data:
+        return "skip_empty"
+
+    try:
+        ticker_fs, date_fs = infer_ticker_and_date(bundle_dir, results_root)
+    except ValueError:
+        logger.warning("skip (cannot resolve ticker/date): %s", bundle_dir)
+        return "skip_unresolved"
+
+    code6 = normalize_a_share_code(ticker_fs)
+    ticker = a_share_prefixed_ticker(code6) if code6.isdigit() and len(code6) == 6 else ticker_fs
+    trade_date = date_fs[:10]
+
+    if skip_existing and query_report(results_root, ticker, trade_date):
+        return "skip_existing"
+
+    complete_report = _complete_report_from_state(data)
+    if not complete_report.strip():
+        return "skip_empty"
+
+    kwargs = build_save_report_args(bundle_dir, complete_report, data, ticker, trade_date)
+    if dry_run:
+        logger.info("[dry-run] would import JSON report %s %s <- %s", ticker, trade_date, jpath)
+        return "dry_run"
+
+    save_report(results_root, **kwargs)
+    logger.info("imported JSON report %s %s <- %s", ticker, trade_date, jpath)
+    return "imported"
+
+
 def import_one_report(
     complete_path: Path,
     results_root: Path,
@@ -383,12 +457,22 @@ def main() -> int:
     logger.info("SQLite database: %s", db_path)
 
     paths = iter_complete_reports(results_root)
+    json_dirs = iter_json_only_bundles(results_root)
     logger.info("found %d complete_report.md file(s) under %s", len(paths), results_root)
+    logger.info("found %d JSON-only bundle(s) under %s", len(json_dirs), results_root)
 
     stats = {"imported": 0, "dry_run": 0, "skip_empty": 0, "skip_unresolved": 0, "skip_existing": 0}
     for p in paths:
         r = import_one_report(
             p,
+            results_root,
+            dry_run=args.dry_run,
+            skip_existing=args.skip_existing,
+        )
+        stats[r] = stats.get(r, 0) + 1
+    for bundle_dir in json_dirs:
+        r = import_one_json_bundle(
+            bundle_dir,
             results_root,
             dry_run=args.dry_run,
             skip_existing=args.skip_existing,

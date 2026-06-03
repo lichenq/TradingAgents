@@ -307,7 +307,9 @@ def load_debate_payload(
     trade_date: str,
 ) -> Dict[str, Any]:
     """Load debate JSON for the SPA from SQLite (reports table)."""
-    ticker_s = (ticker or "").strip()
+    raw_ticker = (ticker or "").strip()
+    code6 = normalize_a_share_code(raw_ticker)
+    ticker_s = code6 if code6.isdigit() and len(code6) == 6 else raw_ticker
     date_s = (trade_date or "").strip()[:10]
     if not ticker_s or not re.match(r"^\d{4}-\d{2}-\d{2}$", date_s):
         return {"ok": False, "error": "Missing or invalid 'ticker' and 'date' parameters"}
