@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 
 from tradingagents.agents.schemas import TraderProposal, render_trader_proposal
 from tradingagents.agents.utils.agent_utils import (
-    get_instrument_context_from_state,
+    build_instrument_context,
     get_language_instruction,
 )
 from tradingagents.agents.utils.position_context import get_trader_action_guidance
@@ -24,7 +24,8 @@ def create_trader(llm):
 
     def trader_node(state, name):
         company_name = state["company_of_interest"]
-        instrument_context = get_instrument_context_from_state(state)
+        asset_type = state.get("asset_type", "stock")
+        instrument_context = build_instrument_context(company_name, asset_type)
         investment_plan = state["investment_plan"]
 
         user_content = (

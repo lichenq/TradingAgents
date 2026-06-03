@@ -1,6 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
-    get_instrument_context_from_state,
+    build_instrument_context,
     get_global_news,
     get_language_instruction,
     get_news,
@@ -29,7 +29,9 @@ def create_news_analyst(llm, *, analyst_thread_key: str | None = None):
         current_date = state["trade_date"]
         asset_type = state.get("asset_type", "stock")
         asset_label = "company" if asset_type == "stock" else "asset"
-        instrument_context = get_instrument_context_from_state(state)
+        instrument_context = build_instrument_context(
+            state["company_of_interest"], asset_type
+        )
 
         tools = [
             get_news,
