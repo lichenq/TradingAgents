@@ -84,15 +84,10 @@ def detect_market_regime(ticker: str, trade_date: str) -> str:
     if not raw_sector:
         return "NORMAL_REGIME"
 
-    # 行业/板块标准别名转换
-    sector_mapping = {
-        "券商信托": "证券",
-        "通讯行业": "通信设备",
-        "通信行业": "通信设备",
-        "消费电子": "元器件",
-        "电机": "电气设备",
-    }
-    sector_name = sector_mapping.get(raw_sector, raw_sector)
+    # 行业/板块标准别名转换 — 通过 sector_mapping 表统一映射
+    from tradingagents.dataflows.sector_mapping import resolve as resolve_sector
+
+    sector_name = resolve_sector(raw_sector)
 
     # 动态获取行业轮动预测
     forecast_data = {}

@@ -1,50 +1,102 @@
 {
   "trade_date": "2026-06-03",
-  "strategy": "macd_resonance",
+  "strategy": "trend_pullback",
   "curation": {
-    "skipped": false,
-    "method": "llm",
-    "portfolio_summary": "今日五个候选标的中，仅云意电气（300304）通过完整报告审查后纳入推荐。核心逻辑：公司正在执行股份回购（已回购1.11亿元），为股价提供明确下行保护；毛利率32.47%在板块内属中上水平；RSI已回落至中性区间，前期过热有所消化。其余四个标的均存在明显瑕疵——长华集团基本面疲弱+实控人减持（Underweight），继峰股份经营现金流深度为负+无催化剂脉冲式炒作，富特科技虽成长性亮眼但大股东减持窗口临近+MACD顶背离，威迈斯多重技术警示信号密集且基本面信息不完整。当前组合采取防守姿态，仅纳入有回购安全垫的标的。",
-    "selected_count": 1
+    "skipped": true,
+    "method": "legacy"
   },
   "parameters": {
     "top_n": 120,
     "validate_top": 5,
     "min_volume_amount": 50000000.0,
-    "skip_curation": false
+    "skip_curation": true
   },
-  "all_screened_count": 10,
+  "all_screened_count": 22,
   "pruned": [],
   "recommendations": [
     {
-      "code": "sz300304",
-      "name": "云意电气",
-      "score": 65.0,
-      "price": 14.56,
+      "code": "sz688001",
+      "name": "华兴源创",
+      "score": 19.195594613472842,
+      "price": 70.45,
       "rating": "Hold",
       "metrics": {
-        "close": 14.73,
-        "ma20": 13.235,
-        "ma60": 13.178166666666668,
-        "dif": 0.29569383076213995,
-        "dea": 0.17886080538532123,
-        "macd": 0.23366605075363744
+        "close": 70.45,
+        "ma10": 73.37800000000001,
+        "ma30": 61.561,
+        "rsi14": 62.53826230280199
       },
-      "reason": "均线多头共振。60日均线向上，价格站稳 MA60 零上，MACD金叉或多头运行，日线趋势共振得分 65 分。",
+      "reason": "日线均线 MA10(73.38) > MA30(61.56) 处于上升趋势，价格回踩至 70.45 附近，RSI(62.5) 处于健康区间。",
       "report_paths": {
         "source": "sqlite",
-        "ticker": "sz300304",
+        "ticker": "sh688001",
         "trade_date": "2026-06-03"
       },
       "report_storage": {
         "source": "sqlite",
-        "ticker": "sz300304",
+        "ticker": "sh688001",
         "trade_date": "2026-06-03"
       },
       "deep_analysis_source": "graph",
       "skipped_deep_analysis": false,
-      "curation_reviewed": true,
-      "curation_evidence": "完整报告显示：截至5月31日已回购816万股/金额1.11亿元，回购构成真金白银的底部支撑。Q1毛利率32.47%在汽车零部件中属中上水平。RSI已从59.66回落至50.94中性区间，前期超买部分消化。6月2日天量成交后短期存在回调概率，但回购提供下行保护。风险收益比较为均衡——回购安全垫+中期趋势向上。"
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz688017",
+      "name": "绿的谐波",
+      "score": 17.400224886461558,
+      "price": 314.88,
+      "rating": "Hold",
+      "metrics": {
+        "close": 314.88,
+        "ma10": 321.57800000000003,
+        "ma30": 273.916,
+        "rsi14": 63.98766124509254
+      },
+      "reason": "日线均线 MA10(321.58) > MA30(273.92) 处于上升趋势，价格回踩至 314.88 附近，RSI(64.0) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh688017",
+        "trade_date": "2026-06-03"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh688017",
+        "trade_date": "2026-06-03"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz300632",
+      "name": "光莆股份",
+      "score": 15.343921778469639,
+      "price": 28.3,
+      "rating": "Hold",
+      "metrics": {
+        "close": 28.3,
+        "ma10": 31.615000000000002,
+        "ma30": 27.409333333333333,
+        "rsi14": 44.4892890406706
+      },
+      "reason": "日线均线 MA10(31.62) > MA30(27.41) 处于上升趋势，价格回踩至 28.30 附近，RSI(44.5) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sz300632",
+        "trade_date": "2026-06-03"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sz300632",
+        "trade_date": "2026-06-03"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
     }
   ]
 }

@@ -158,15 +158,16 @@ def _auto_discover_peer_codes(ticker: str, config: dict, limit: int = 4) -> List
     if not industry:
         return []
 
-    # Map sector/industry name if needed
-    sector_mapping = {
-        "券商信托": "证券",
-        "通讯行业": "通信设备",
-        "通信行业": "通信设备",
-        "消费电子": "元器件",
-        "电机": "电气设备",
-    }
-    resolved_industry = sector_mapping.get(industry, industry)
+    # Map sector/industry name via central mapping table
+    from tradingagents.dataflows.sector_mapping import (
+        get_danginvest_boards,
+        resolve,
+    )
+    resolved_industry = resolve(industry)
+    # Prefer DangInvest board name for the API call
+    mapped_boards = get_danginvest_boards(resolved_industry)
+    if mapped_boards:
+        resolved_industry = mapped_boards[0]
 
     ok, raw, board_detail = run_script(
         "fetch_realtime.py",

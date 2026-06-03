@@ -1,0 +1,1071 @@
+- canonical: 银行
+  source:
+    eastmoney_industry:
+    - 银行
+    eastmoney_concept:
+    - 银行
+    danginvest_board:
+    - 银行
+  search_keywords:
+  - 银行
+  - 银行股
+  - 商业银行
+  overlap_evidence:
+    银行->银行: probe votes 5/5
+- canonical: 专用设备
+  source:
+    eastmoney_industry:
+    - 专用设备
+    - 机械设备
+    eastmoney_concept: []
+    danginvest_board:
+    - 专用机械
+    - 农用机械
+    - 化工机械
+    - 纺织机械
+    - 轻工机械
+  search_keywords:
+  - 专用设备
+  overlap_evidence:
+    化工机械->专用设备: probe votes 5/5
+    纺织机械->专用设备: probe votes 4/5
+    轻工机械->专用设备: probe votes 4/5
+    专用机械->专用设备: probe votes 3/5
+    农用机械->专用设备: probe votes 2/5
+- canonical: 半导体
+  source:
+    eastmoney_industry:
+    - 半导体
+    eastmoney_concept:
+    - 半导体
+    - 国产芯片
+    - AI芯片
+    - 芯片
+    - 集成电路
+    danginvest_board:
+    - 半导体
+  search_keywords:
+  - 半导体
+  - 芯片
+  - 集成电路
+  - 国产芯片 自主可控
+  overlap_evidence:
+    半导体->半导体: probe votes 5/5
+- canonical: 酿酒行业
+  source:
+    eastmoney_industry:
+    - 酿酒行业
+    eastmoney_concept:
+    - 白酒
+    danginvest_board:
+    - 啤酒
+    - 白酒
+    - 红黄酒
+  search_keywords:
+  - 白酒
+  - 白酒板块
+  - 高端白酒
+  overlap_evidence:
+    白酒->酿酒行业: probe votes 5/5
+    红黄酒->酿酒行业: probe votes 5/5
+    啤酒->酿酒行业: probe votes 4/5
+- canonical: 保险
+  source:
+    eastmoney_industry:
+    - 保险
+    eastmoney_concept: []
+    danginvest_board:
+    - 保险
+  search_keywords:
+  - 保险
+  overlap_evidence:
+    保险->保险: probe votes 5/5
+- canonical: 煤炭采选
+  source:
+    eastmoney_industry:
+    - 煤炭采选
+    eastmoney_concept: []
+    danginvest_board:
+    - 焦炭加工
+    - 煤炭开采
+  search_keywords:
+  - 煤炭采选
+  overlap_evidence:
+    煤炭开采->煤炭采选: probe votes 5/5
+    焦炭加工->煤炭采选: probe votes 5/5
+- canonical: 有色金属
+  source:
+    eastmoney_industry:
+    - 有色金属
+    eastmoney_concept:
+    - 有色金属
+    danginvest_board:
+    - 铅锌
+    - 铜
+    - 铝
+  search_keywords:
+  - 有色金属
+  - 有色板块
+  overlap_evidence:
+    铜->有色金属: probe votes 5/5
+    铝->有色金属: probe votes 5/5
+    铅锌->有色金属: probe votes 5/5
+- canonical: 电力行业
+  source:
+    eastmoney_industry:
+    - 电力行业
+    eastmoney_concept: []
+    danginvest_board:
+    - 新型电力
+    - 水力发电
+    - 火力发电
+  search_keywords:
+  - 电力行业
+  overlap_evidence:
+    新型电力->电力行业: probe votes 5/5
+    水力发电->电力行业: probe votes 5/5
+    火力发电->电力行业: probe votes 5/5
+- canonical: 汽车整车
+  source:
+    eastmoney_industry:
+    - 汽车整车
+    eastmoney_concept:
+    - 新能源汽车
+    - 汽车整车
+    danginvest_board:
+    - 汽车整车
+  search_keywords:
+  - 汽车整车
+  - 新能源汽车
+  overlap_evidence:
+    汽车整车->汽车整车: probe votes 5/5
+- canonical: 建筑工程
+  source:
+    eastmoney_industry:
+    - 工程建设
+    eastmoney_concept:
+    - 基建
+    - 一带一路
+    danginvest_board:
+    - 建筑工程
+  search_keywords:
+  - 建筑工程
+  - 基建
+  - 工程建设
+  overlap_evidence:
+    建筑工程->工程建设: probe votes 5/5
+- canonical: 食品饮料
+  source:
+    eastmoney_industry:
+    - 食品饮料
+    eastmoney_concept:
+    - 食品
+    - 预制菜
+    danginvest_board:
+    - 乳制品
+    - 软饮料
+    - 食品
+  search_keywords:
+  - 食品
+  - 食品饮料
+  - 预制菜
+  overlap_evidence:
+    乳制品->食品饮料: probe votes 5/5
+    软饮料->食品饮料: probe votes 5/5
+    食品->食品饮料: probe votes 4/5
+- canonical: 工程机械
+  source:
+    eastmoney_industry:
+    - 工程机械
+    eastmoney_concept: []
+    danginvest_board:
+    - 工程机械
+  search_keywords:
+  - 工程机械
+  overlap_evidence:
+    工程机械->工程机械: probe votes 5/5
+- canonical: 中成药
+  source:
+    eastmoney_industry:
+    - 中药
+    eastmoney_concept:
+    - 中医药
+    - 中药
+    danginvest_board:
+    - 中成药
+  search_keywords:
+  - 中成药
+  - 中药
+  - 中医药
+  overlap_evidence:
+    中成药->中药: probe votes 5/5
+- canonical: 港口水运
+  source:
+    eastmoney_industry:
+    - 港口水运
+    eastmoney_concept: []
+    danginvest_board:
+    - 水运
+    - 港口
+  search_keywords:
+  - 港口水运
+  overlap_evidence:
+    港口->港口水运: probe votes 5/5
+    水运->港口水运: probe votes 4/5
+- canonical: 钢铁行业
+  source:
+    eastmoney_industry:
+    - 钢铁行业
+    eastmoney_concept: []
+    danginvest_board:
+    - 普钢
+    - 特种钢
+    - 钢加工
+  search_keywords:
+  - 钢铁行业
+  overlap_evidence:
+    普钢->钢铁行业: probe votes 5/5
+    特种钢->钢铁行业: probe votes 5/5
+    钢加工->钢铁行业: probe votes 2/5
+- canonical: 农牧饲渔
+  source:
+    eastmoney_industry:
+    - 农牧饲渔
+    eastmoney_concept: []
+    danginvest_board:
+    - 农业综合
+    - 林业
+    - 渔业
+    - 种植业
+    - 饲料
+  search_keywords:
+  - 农牧饲渔
+  overlap_evidence:
+    农业综合->农牧饲渔: probe votes 5/5
+    种植业->农牧饲渔: probe votes 5/5
+    饲料->农牧饲渔: probe votes 4/5
+    渔业->农牧饲渔: probe votes 4/5
+    林业->农牧饲渔: probe votes 3/4
+- canonical: 黄金
+  source:
+    eastmoney_industry:
+    - 贵金属
+    eastmoney_concept: []
+    danginvest_board:
+    - 黄金
+  search_keywords:
+  - 黄金
+  overlap_evidence:
+    黄金->贵金属: probe votes 5/5
+- canonical: 纺织服装
+  source:
+    eastmoney_industry:
+    - 纺织服装
+    eastmoney_concept:
+    - 纺织服装
+    - 服饰
+    danginvest_board:
+    - 服饰
+    - 纺织
+  search_keywords:
+  - 服饰
+  - 纺织服装
+  overlap_evidence:
+    纺织->纺织服装: probe votes 5/5
+    服饰->纺织服装: probe votes 4/5
+- canonical: 民航机场
+  source:
+    eastmoney_industry:
+    - 民航机场
+    eastmoney_concept: []
+    danginvest_board:
+    - 机场
+    - 空运
+  search_keywords:
+  - 民航机场
+  overlap_evidence:
+    空运->民航机场: probe votes 5/5
+    机场->民航机场: probe votes 4/5
+- canonical: 多元金融
+  source:
+    eastmoney_industry:
+    - 多元金融
+    eastmoney_concept: []
+    danginvest_board:
+    - 多元金融
+  search_keywords:
+  - 多元金融
+  overlap_evidence:
+    多元金融->多元金融: probe votes 5/5
+- canonical: 文化传媒
+  source:
+    eastmoney_industry:
+    - 文化传媒
+    eastmoney_concept: []
+    danginvest_board:
+    - 出版业
+    - 广告包装
+    - 影视音像
+  search_keywords:
+  - 文化传媒
+  overlap_evidence:
+    影视音像->文化传媒: probe votes 5/5
+    出版业->文化传媒: probe votes 5/5
+    广告包装->文化传媒: probe votes 3/5
+- canonical: 房地产
+  source:
+    eastmoney_industry:
+    - 房地产
+    eastmoney_concept:
+    - 房地产
+    - 租售同权
+    - 物业管理
+    danginvest_board:
+    - 全国地产
+    - 区域地产
+    - 园区开发
+  search_keywords:
+  - 房地产
+  - 地产
+  - 楼市
+  overlap_evidence:
+    园区开发->房地产: probe votes 5/5
+    全国地产->房地产: probe votes 4/5
+    区域地产->房地产: probe votes 4/5
+- canonical: 水泥
+  source:
+    eastmoney_industry:
+    - 水泥建材
+    eastmoney_concept: []
+    danginvest_board:
+    - 水泥
+  search_keywords:
+  - 水泥
+  overlap_evidence:
+    水泥->水泥建材: probe votes 5/5
+- canonical: 医药商业
+  source:
+    eastmoney_industry:
+    - 医药商业
+    eastmoney_concept: []
+    danginvest_board:
+    - 医药商业
+  search_keywords:
+  - 医药商业
+  overlap_evidence:
+    医药商业->医药商业: probe votes 5/5
+- canonical: 高速公路
+  source:
+    eastmoney_industry:
+    - 高速公路
+    eastmoney_concept: []
+    danginvest_board:
+    - 公共交通
+    - 路桥
+  search_keywords:
+  - 高速公路
+  overlap_evidence:
+    路桥->高速公路: probe votes 5/5
+    公共交通->高速公路: probe votes 4/5
+- canonical: 商业百货
+  source:
+    eastmoney_industry:
+    - 商业百货
+    eastmoney_concept: []
+    danginvest_board:
+    - 其他商业
+    - 商品城
+    - 电器连锁
+    - 百货
+    - 超市连锁
+  search_keywords:
+  - 商业百货
+  overlap_evidence:
+    超市连锁->商业百货: probe votes 5/5
+    百货->商业百货: probe votes 4/5
+    商品城->商业百货: probe votes 4/4
+    其他商业->商业百货: probe votes 3/5
+    电器连锁->商业百货: probe votes 2/2
+- canonical: 旅游酒店
+  source:
+    eastmoney_industry:
+    - 旅游酒店
+    eastmoney_concept: []
+    danginvest_board:
+    - 旅游景点
+    - 旅游服务
+    - 酒店餐饮
+  search_keywords:
+  - 旅游酒店
+  overlap_evidence:
+    旅游景点->旅游酒店: probe votes 5/5
+    酒店餐饮->旅游酒店: probe votes 5/5
+    旅游服务->旅游酒店: probe votes 4/5
+- canonical: 日用化工
+  source:
+    eastmoney_industry:
+    - 美容护理
+    eastmoney_concept: []
+    danginvest_board:
+    - 日用化工
+  search_keywords:
+  - 日用化工
+  overlap_evidence:
+    日用化工->美容护理: probe votes 5/5
+- canonical: 房产服务
+  source:
+    eastmoney_industry:
+    - 房地产服务
+    eastmoney_concept: []
+    danginvest_board:
+    - 房产服务
+  search_keywords:
+  - 房产服务
+  overlap_evidence:
+    房产服务->房地产服务: probe votes 5/5
+- canonical: 水务
+  source:
+    eastmoney_industry:
+    - 公用事业
+    eastmoney_concept: []
+    danginvest_board:
+    - 水务
+  search_keywords:
+  - 水务
+  overlap_evidence:
+    水务->公用事业: probe votes 5/5
+- canonical: 证券
+  source:
+    eastmoney_industry:
+    - 券商信托
+    eastmoney_concept: []
+    danginvest_board:
+    - 证券
+  search_keywords:
+  - 证券 板块
+  - 券商
+  - 券商股
+  overlap_evidence:
+    证券->券商信托: probe votes 4/5
+- canonical: 石油行业
+  source:
+    eastmoney_industry:
+    - 石油行业
+    eastmoney_concept: []
+    danginvest_board:
+    - 石油加工
+    - 石油开采
+    - 石油贸易
+  search_keywords:
+  - 石油行业
+  overlap_evidence:
+    石油加工->石油行业: probe votes 4/5
+    石油贸易->石油行业: probe votes 4/4
+    石油开采->石油行业: probe votes 2/5
+- canonical: 通信设备
+  source:
+    eastmoney_industry:
+    - 通讯行业
+    - 通信行业
+    eastmoney_concept:
+    - 5G
+    - 6G
+    - 光通信
+    - 卫星通信
+    danginvest_board:
+    - 通信设备
+  search_keywords:
+  - 通信设备
+  - 5G 板块
+  - 光通信
+  overlap_evidence:
+    通信设备->通讯行业: probe votes 4/5
+- canonical: 电子元件
+  source:
+    eastmoney_industry:
+    - 电子元件
+    eastmoney_concept:
+    - 消费电子
+    - 电子元件
+    - 被动元件
+    danginvest_board:
+    - 元器件
+    - 电器仪表
+  search_keywords:
+  - 元器件
+  - 消费电子
+  - 电子元件
+  overlap_evidence:
+    元器件->电子元件: probe votes 4/5
+    电器仪表->电子元件: probe votes 2/5
+- canonical: 小金属
+  source:
+    eastmoney_industry:
+    - 小金属
+    eastmoney_concept:
+    - 小金属
+    - 稀土
+    danginvest_board:
+    - 小金属
+    - 矿物制品
+  search_keywords:
+  - 小金属
+  - 稀土
+  - 有色金属
+  overlap_evidence:
+    小金属->小金属: probe votes 4/5
+    矿物制品->小金属: probe votes 2/5
+- canonical: 医疗保健
+  source:
+    eastmoney_industry:
+    - 医疗器械
+    eastmoney_concept:
+    - 医疗器械
+    - 医疗
+    danginvest_board:
+    - 医疗保健
+  search_keywords:
+  - 医疗
+  - 医疗器械
+  - 医疗保健
+  overlap_evidence:
+    医疗保健->医疗器械: probe votes 4/5
+- canonical: 家用电器
+  source:
+    eastmoney_industry:
+    - 家电行业
+    eastmoney_concept:
+    - 家用电器
+    - 智能家居
+    danginvest_board:
+    - 家用电器
+  search_keywords:
+  - 家用电器
+  - 家电
+  - 智能家居
+  overlap_evidence:
+    家用电器->家电行业: probe votes 4/5
+- canonical: 航空
+  source:
+    eastmoney_industry:
+    - 航天航空
+    eastmoney_concept:
+    - 航天
+    - 航空航天
+    - 大飞机
+    - 军工
+    danginvest_board:
+    - 航空
+  search_keywords:
+  - 航空
+  - 航天
+  - 大飞机
+  - 军工 航空
+  overlap_evidence:
+    航空->航天航空: probe votes 4/5
+- canonical: 农药化肥
+  source:
+    eastmoney_industry:
+    - 化肥行业
+    eastmoney_concept:
+    - 农药
+    - 化肥
+    danginvest_board:
+    - 农药化肥
+  search_keywords:
+  - 农药
+  - 化肥
+  - 农药化肥
+  overlap_evidence:
+    农药化肥->化肥行业: probe votes 4/5
+- canonical: 交运物流
+  source:
+    eastmoney_industry:
+    - 交运物流
+    eastmoney_concept: []
+    danginvest_board:
+    - 仓储物流
+    - 公路
+    - 铁路
+  search_keywords:
+  - 交运物流
+  overlap_evidence:
+    铁路->交运物流: probe votes 4/5
+    仓储物流->交运物流: probe votes 3/5
+    公路->交运物流: probe votes 3/3
+- canonical: 化纤
+  source:
+    eastmoney_industry:
+    - 化纤行业
+    eastmoney_concept: []
+    danginvest_board:
+    - 化纤
+  search_keywords:
+  - 化纤
+  overlap_evidence:
+    化纤->化纤行业: probe votes 4/5
+- canonical: 船舶
+  source:
+    eastmoney_industry:
+    - 船舶制造
+    eastmoney_concept: []
+    danginvest_board:
+    - 船舶
+  search_keywords:
+  - 船舶
+  overlap_evidence:
+    船舶->船舶制造: probe votes 4/5
+- canonical: 交运设备
+  source:
+    eastmoney_industry:
+    - 交运设备
+    eastmoney_concept: []
+    danginvest_board:
+    - 摩托车
+    - 运输设备
+  search_keywords:
+  - 交运设备
+  overlap_evidence:
+    摩托车->交运设备: probe votes 4/5
+    运输设备->交运设备: probe votes 3/5
+- canonical: 供气供热
+  source:
+    eastmoney_industry:
+    - 燃气
+    eastmoney_concept: []
+    danginvest_board:
+    - 供气供热
+  search_keywords:
+  - 供气供热
+  overlap_evidence:
+    供气供热->燃气: probe votes 4/5
+- canonical: 装修建材
+  source:
+    eastmoney_industry:
+    - 装修建材
+    eastmoney_concept: []
+    danginvest_board:
+    - 其他建材
+    - 陶瓷
+  search_keywords:
+  - 装修建材
+  overlap_evidence:
+    陶瓷->装修建材: probe votes 4/5
+    其他建材->装修建材: probe votes 3/5
+- canonical: 造纸
+  source:
+    eastmoney_industry:
+    - 造纸印刷
+    eastmoney_concept: []
+    danginvest_board:
+    - 造纸
+  search_keywords:
+  - 造纸
+  overlap_evidence:
+    造纸->造纸印刷: probe votes 4/5
+- canonical: 综合行业
+  source:
+    eastmoney_industry:
+    - 综合行业
+    eastmoney_concept: []
+    danginvest_board:
+    - 批发业
+    - 综合类
+  search_keywords:
+  - 综合行业
+  overlap_evidence:
+    综合类->综合行业: probe votes 4/5
+    批发业->综合行业: probe votes 2/5
+- canonical: 装修装饰
+  source:
+    eastmoney_industry:
+    - 装修装饰
+    eastmoney_concept: []
+    danginvest_board:
+    - 装修装饰
+  search_keywords:
+  - 装修装饰
+  overlap_evidence:
+    装修装饰->装修装饰: probe votes 4/5
+- canonical: 汽车服务
+  source:
+    eastmoney_industry:
+    - 汽车服务
+    eastmoney_concept: []
+    danginvest_board:
+    - 汽车服务
+  search_keywords:
+  - 汽车服务
+  overlap_evidence:
+    汽车服务->汽车服务: probe votes 4/5
+- canonical: 商贸代理
+  source:
+    eastmoney_industry:
+    - 国际贸易
+    eastmoney_concept: []
+    danginvest_board:
+    - 商贸代理
+  search_keywords:
+  - 商贸代理
+  overlap_evidence:
+    商贸代理->国际贸易: probe votes 4/5
+- canonical: 化工行业
+  source:
+    eastmoney_industry:
+    - 化工行业
+    - 材料行业
+    - 材料
+    eastmoney_concept:
+    - 化工
+    - 新材料
+    - 氟化工
+    danginvest_board:
+    - 化工原料
+    - 染料涂料
+  search_keywords:
+  - 化工
+  - 化工原料
+  - 新材料
+  overlap_evidence:
+    化工原料->化工行业: probe votes 3/5
+    染料涂料->化工行业: probe votes 2/5
+- canonical: 软件服务
+  source:
+    eastmoney_industry:
+    - 软件服务
+    eastmoney_concept:
+    - 软件服务
+    - 信创
+    danginvest_board:
+    - 软件服务
+  search_keywords:
+  - 软件
+  - 软件服务
+  - 信创
+  overlap_evidence:
+    软件服务->软件服务: probe votes 3/5
+- canonical: 汽车配件
+  source:
+    eastmoney_industry:
+    - 汽车行业
+    eastmoney_concept:
+    - 汽车零部件
+    - 胎压监测
+    danginvest_board:
+    - 汽车配件
+  search_keywords:
+  - 汽车配件
+  - 汽车零部件
+  - 汽配
+  overlap_evidence:
+    汽车配件->汽车行业: probe votes 3/5
+- canonical: 电信运营
+  source:
+    eastmoney_industry:
+    - 通信服务
+    eastmoney_concept: []
+    danginvest_board:
+    - 电信运营
+  search_keywords:
+  - 电信运营
+  overlap_evidence:
+    电信运营->通信服务: probe votes 3/5
+- canonical: IT设备
+  source:
+    eastmoney_industry:
+    - 计算机设备
+    eastmoney_concept:
+    - IT设备
+    danginvest_board:
+    - IT设备
+  search_keywords:
+  - IT设备
+  - 计算机设备
+  overlap_evidence:
+    IT设备->计算机设备: probe votes 3/5
+- canonical: 化学制药
+  source:
+    eastmoney_industry:
+    - 医药制造
+    eastmoney_concept:
+    - 化学制药
+    - 创新药
+    danginvest_board:
+    - 化学制药
+  search_keywords:
+  - 化学制药
+  - 创新药
+  overlap_evidence:
+    化学制药->医药制造: probe votes 3/5
+- canonical: 机械基件
+  source:
+    eastmoney_industry:
+    - 机械行业
+    eastmoney_concept: []
+    danginvest_board:
+    - 机械基件
+  search_keywords:
+  - 机械基件
+  overlap_evidence:
+    机械基件->机械行业: probe votes 3/5
+- canonical: 生物制药
+  source:
+    eastmoney_industry:
+    - 生物制品
+    eastmoney_concept:
+    - 生物医药
+    - 生物疫苗
+    danginvest_board:
+    - 生物制药
+  search_keywords:
+  - 生物制药
+  - 生物医药
+  - 疫苗
+  overlap_evidence:
+    生物制药->生物制品: probe votes 3/5
+- canonical: 互联网
+  source:
+    eastmoney_industry:
+    - 游戏
+    eastmoney_concept:
+    - 互联网
+    - 数字经济
+    danginvest_board:
+    - 互联网
+  search_keywords:
+  - 互联网
+  - 数字经济
+  overlap_evidence:
+    互联网->游戏: probe votes 3/5
+- canonical: 玻璃
+  source:
+    eastmoney_industry:
+    - 玻璃陶瓷
+    eastmoney_concept: []
+    danginvest_board:
+    - 玻璃
+  search_keywords:
+  - 玻璃
+  overlap_evidence:
+    玻璃->玻璃陶瓷: probe votes 3/5
+- canonical: 环境保护
+  source:
+    eastmoney_industry:
+    - 环保行业
+    eastmoney_concept:
+    - 环保
+    - 碳中和
+    - 污水处理
+    danginvest_board:
+    - 环境保护
+  search_keywords:
+  - 环保
+  - 环境保护
+  - 碳中和
+  overlap_evidence:
+    环境保护->环保行业: probe votes 3/5
+- canonical: 家居用品
+  source:
+    eastmoney_industry:
+    - 木业家具
+    eastmoney_concept:
+    - 家居
+    danginvest_board:
+    - 家居用品
+  search_keywords:
+  - 家居
+  - 家居用品
+  overlap_evidence:
+    家居用品->木业家具: probe votes 3/5
+- canonical: 文教休闲
+  source:
+    eastmoney_industry:
+    - 家用轻工
+    eastmoney_concept:
+    - 文教
+    - 休闲
+    danginvest_board:
+    - 文教休闲
+  search_keywords:
+  - 文教
+  - 休闲
+  overlap_evidence:
+    文教休闲->家用轻工: probe votes 3/5
+- canonical: 机床制造
+  source:
+    eastmoney_industry:
+    - 通用设备
+    eastmoney_concept: []
+    danginvest_board:
+    - 机床制造
+  search_keywords:
+  - 机床制造
+  overlap_evidence:
+    机床制造->通用设备: probe votes 3/5
+- canonical: 橡胶
+  source:
+    eastmoney_industry:
+    - 橡胶制品
+    eastmoney_concept:
+    - 橡胶
+    danginvest_board:
+    - 橡胶
+  search_keywords:
+  - 橡胶
+  - 橡胶制品
+  overlap_evidence:
+    橡胶->橡胶制品: probe votes 3/5
+- canonical: 电气设备
+  source:
+    eastmoney_industry:
+    - 光伏设备
+    - 电机
+    eastmoney_concept:
+    - 特高压
+    - 智能电网
+    - 充电桩
+    danginvest_board:
+    - 电气设备
+  search_keywords:
+  - 电气设备
+  - 电机
+  - 特高压
+  - 智能电网
+  overlap_evidence:
+    电气设备->光伏设备: probe votes 2/5
+- canonical: 塑料
+  source:
+    eastmoney_industry:
+    - 塑胶制品
+    eastmoney_concept:
+    - 可降解塑料
+    danginvest_board:
+    - 塑料
+  search_keywords:
+  - 塑料
+  - 橡胶
+  overlap_evidence:
+    塑料->塑胶制品: probe votes 2/5
+- canonical: 人工智能
+  source:
+    eastmoney_industry:
+    - 软件开发
+    - 互联网服务
+    eastmoney_concept:
+    - 人工智能
+    - AI
+    - AIGC
+    - 大模型
+    - ChatGPT
+    - 算力
+    danginvest_board: []
+  search_keywords:
+  - 人工智能
+  - AI
+  - 大模型
+  - 算力
+  - AIGC
+  overlap_evidence: {}
+- canonical: 人形机器人
+  source:
+    eastmoney_industry:
+    - 自动化设备
+    eastmoney_concept:
+    - 人形机器人
+    - 具身智能
+    - 机器人
+    danginvest_board: ["人形机器人", "机器人概念"]
+  search_keywords:
+  - 人形机器人
+  - 具身智能
+  - 机器人 产业链
+  - 人形机器人 供应链
+  overlap_evidence: {}
+- canonical: 新能源汽车
+  source:
+    eastmoney_industry:
+    - 汽车整车
+    eastmoney_concept:
+    - 新能源汽车
+    - 锂电池
+    - 充电桩
+    - 特斯拉
+    - 固态电池
+    danginvest_board: []
+  search_keywords:
+  - 新能源汽车
+  - 新能源车
+  - 电动汽车
+  - 锂电池
+  - 固态电池
+  overlap_evidence: {}
+- canonical: 光伏
+  source:
+    eastmoney_industry:
+    - 光伏设备
+    eastmoney_concept:
+    - 光伏
+    - 太阳能
+    - HJT
+    - 钙钛矿
+    - TOPCon
+    danginvest_board: []
+  search_keywords:
+  - 光伏
+  - 太阳能
+  - HJT 电池
+  - 光伏产业链
+  overlap_evidence: {}
+- canonical: 医药
+  source:
+    eastmoney_industry:
+    - 医药制造
+    - 医疗行业
+    eastmoney_concept:
+    - 创新药
+    - CXO
+    - 生物疫苗
+    - 中医药
+    - 医疗器械
+    danginvest_board:
+    - 医疗保健
+    - 化学制药
+    - 生物制药
+  search_keywords:
+  - 医药
+  - 创新药
+  - CXO 板块
+  - 医疗器械
+  overlap_evidence: {}
+- canonical: 数据中心
+  source:
+    eastmoney_industry:
+    - 通信服务
+    eastmoney_concept:
+    - 数据中心
+    - 云计算
+    - 东数西算
+    - 算力
+    - IDC
+    danginvest_board: []
+  search_keywords:
+  - 数据中心
+  - IDC
+  - 云计算
+  - 东数西算
+  overlap_evidence: {}
+- canonical: 低空经济
+  source:
+    eastmoney_industry: []
+    eastmoney_concept:
+    - 低空经济
+    - eVTOL
+    - 飞行汽车
+    - 无人机
+    danginvest_board: []
+  search_keywords:
+  - 低空经济
+  - eVTOL
+  - 飞行汽车
+  - 无人机 产业
+  overlap_evidence: {}

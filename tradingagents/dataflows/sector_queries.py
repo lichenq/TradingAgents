@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from tradingagents.dataflows.a_share_runner import run_script
+from tradingagents.dataflows.sector_mapping import (
+    expand_queries,
+    get_search_keywords,
+    resolve,
+)
 from tradingagents.market import effective_market_profile, is_cn_ticker, normalize_a_share_code
 
 
@@ -34,6 +39,13 @@ def merge_news_queries(config: dict) -> List[str]:
             continue
         seen.add(text)
         merged.append(text)
+
+    # Expand queries through the sector mapping table — each query that
+    # contains a known sector name gets synonyms substituted automatically.
+    expanded = expand_queries(merged)
+    if expanded:
+        merged = expanded
+
     return merged
 
 
@@ -43,7 +55,10 @@ def industry_to_search_queries(
     name: str = "",
     code6: str = "",
 ) -> List[str]:
-    """Turn 东财行业名 into CN news keyword strings (DangInvest / 东财过滤用)."""
+    """Turn 东财行业名 into CN news keyword strings (DangInvest / 东财过滤用).
+
+    Uses the sector mapping table to expand keywords from the canonical sector.
+    """
     industry = (industry or "").strip()
     if not industry:
         return []
@@ -57,6 +72,19 @@ def industry_to_search_queries(
         queries.append(f"A股 {clean_name} {industry}")
     if code6:
         queries.append(f"A股 {code6} {industry}")
+
+    # Expand via sector mapping — resolve industry name to canonical, then
+    # substitute search keywords from the mapping as additional query variants.
+    canonical = resolve(industry)
+    if canonical != industry:
+        keywords = get_search_keywords(canonical)
+        for kw in keywords:
+            q = f"A股 {kw} 政策 龙头"
+            if q not in queries:
+                queries.append(q)
+            q2 = f"A股 {kw} 行业 景气 业绩 估值"
+            if q2 not in queries:
+                queries.append(q2)
     return queries
 
 

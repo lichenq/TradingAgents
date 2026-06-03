@@ -703,16 +703,17 @@ def main() -> int:
 
         board_codes = set()
         if args.board:
-            # Smart Board Name Mapping to align with Eastmoney/DangInvest industry names
-            board_aliases = {
-                "航天航空": "航空",
-                "航空航天": "航空",
-                "航天": "航空",
-                "电子元件": "元器件",
-                "材料行业": "化工原料",
-                "材料": "化工原料",
-            }
-            resolved_board = board_aliases.get(args.board, args.board)
+            # Sector name normalization via central mapping table
+            from tradingagents.dataflows.sector_mapping import (
+                get_danginvest_boards,
+                resolve as resolve_sector,
+            )
+
+            resolved_board = resolve_sector(args.board)
+            # If mapping exists, prefer the DangInvest board name (used in API calls)
+            mapped_boards = get_danginvest_boards(resolved_board)
+            if mapped_boards:
+                resolved_board = mapped_boards[0]
             if resolved_board != args.board:
                 prog.step(f"板块名称智能映射: '{args.board}' -> '{resolved_board}'")
 
@@ -745,26 +746,37 @@ def main() -> int:
                 else:
                     logger.warning(f"自动获取热点行业失败: {raw_b}")
             else:
-                prog.step(f"正在获取 '{resolved_board}' 板块成分股...")
-                ok_c, raw_c, board_detail = run_a_share_script(
-                    "fetch_realtime.py",
-                    ["--boards-detail", "--boards-group-key", resolved_board, "--boards-items-limit", "300", "--json"]
-                )
-                if ok_c and isinstance(board_detail, dict):
-                    items = (board_detail.get("data") or {}).get("items") or []
-                    for item in items:
-                        code = item.get("code") or ""
-                        code6 = "".join(ch for ch in code if ch.isdigit())[-6:]
-                        if len(code6) == 6:
-                            board_codes.add(code6)
+                def _fetch_board(mode: str) -> set:
+                    """Fetch board detail with given mode, return set of 6-digit codes."""
+                    codes: set = set()
+                    prog.step(f"正在获取 '{resolved_board}' {mode}板块成分股...")
+                    ok_c, raw_c, board_detail = run_a_share_script(
+                        "fetch_realtime.py",
+                        ["--boards-detail", "--boards-mode", mode, "--boards-group-key", resolved_board, "--boards-items-limit", "300", "--json"]
+                    )
+                    if ok_c and isinstance(board_detail, dict):
+                        items = (board_detail.get("data") or {}).get("items") or []
+                        for item in items:
+                            code = item.get("code") or ""
+                            code6 = "".join(ch for ch in code if ch.isdigit())[-6:]
+                            if len(code6) == 6:
+                                codes.add(code6)
+                    return codes
+
+                board_codes = _fetch_board("industry")
+                if not board_codes:
+                    board_codes = _fetch_board("concept")
+
+                if board_codes:
                     prog.step(f"板块 '{resolved_board}' 共获取到 {len(board_codes)} 只成分股")
                 else:
-                    logger.warning(f"获取板块 '{resolved_board}' 成分股失败: {raw_c}")
+                    logger.warning(f"获取板块 '{resolved_board}' 成分股失败 (industry/concept 均无结果)")
 
             # If the user specified a board but we got 0 constituents, fail fast with error
             if not board_codes:
                 logger.error(f"错误: 无法获取板块 '{resolved_board}' 的任何成分股！请检查板块名称是否正确或拼写。")
                 logger.error("常用的板块名称示例: '半导体', '元器件', '电气设备', '通信设备', '航空', '化工原料', '专用机械', '小金属' 等。")
+                logger.error("也可用概念板块名: '人形机器人', '机器人概念', '人工智能', '芯片概念', '新能源汽车' 等。")
                 return 1
 
             filtered_quotes = [

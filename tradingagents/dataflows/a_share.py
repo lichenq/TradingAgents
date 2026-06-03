@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import socket
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Dict, List
 
@@ -425,6 +426,156 @@ def get_a_share_global_news(
     return "\n\n".join(parts)
 
 
+def _patch_emweb_dns() -> None:
+    """Monkey-patch ``socket.getaddrinfo`` so ``*.securities.eastmoney.com`` resolves via public DNS.
+
+    The internal corporate DNS (10.251.1.1) cannot resolve
+    ``emweb.securities.eastmoney.com`` which is served by a CDN (CNAME → ``*.cdngslb.com``),
+    causing ``akshare`` calls to fail with ``NameResolutionError``.
+    """
+    import dns.resolver as _dns_resolver
+
+    if getattr(socket, "_emweb_dns_patched", False):
+        return
+
+    _original_getaddrinfo = socket.getaddrinfo
+
+    def _resolved(host: str, port: int) -> list:
+        resolver = _dns_resolver.Resolver()
+        resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+        answers = resolver.resolve(host, "A")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (str(answers[0]), port))]
+
+    def _patched_getaddrinfo(
+        host, port, family=0, type=0, proto=0, flags=0
+    ):
+        if "securities.eastmoney.com" in host:
+            try:
+                return _resolved(host, port)
+            except Exception:
+                pass
+        return _original_getaddrinfo(host, port, family, type, proto, flags)
+
+    socket.getaddrinfo = _patched_getaddrinfo
+    socket._emweb_dns_patched = True  # type: ignore[attr-defined]
+
+
+def _code6_to_market_prefix(code6: str) -> str:
+    """Return the akshare market prefix for a 6-digit A-share code."""
+    return "SH" if code6.startswith(("5", "6", "9")) else "SZ"
+
+
+def _fetch_akshare_detailed_fundamentals(code6: str) -> str:
+    """Fetch capital-expenditure, R&D, cash-flow via akshare (three financial statements).
+
+    Requires ``dnspython`` and ``akshare`` installed in the running Python environment.
+    Returns a Markdown block or empty string on failure.
+    """
+    _patch_emweb_dns()
+    try:
+        import akshare as ak
+    except ImportError:
+        return ""
+
+    market = _code6_to_market_prefix(code6)
+    symbol = f"{market}{code6}"
+
+    lines: list[str] = []
+    try:
+        # ── Balance sheet ──────────────────────────────────────────
+        bs = ak.stock_balance_sheet_by_report_em(symbol=symbol)
+        if bs is not None and len(bs) > 0:
+            latest = bs.iloc[0]
+            lines.append("### 资产负债表关键项（最新报告期）")
+            lines.append(f"- 报告期: {latest.get('REPORT_DATE', 'N/A')}")
+            for col, label in [
+                ("MONETARYFUNDS", "货币资金"),
+                ("ACCOUNTS_RECE", "应收账款"),
+                ("INVENTORY", "存货"),
+                ("TOTAL_CURRENT_ASSETS", "流动资产合计"),
+                ("FIXED_ASSET", "固定资产"),
+                ("INTANGIBLE_ASSET", "无形资产"),
+                ("GOODWILL", "商誉"),
+                ("SHORT_LOAN", "短期借款"),
+                ("ACCOUNTS_PAYABLE", "应付账款"),
+                ("TOTAL_CURRENT_LIAB", "流动负债合计"),
+                ("TOTAL_LIABILITIES", "负债合计"),
+                ("TOTAL_EQUITY", "股东权益合计"),
+                ("CONTRACT_ASSET", "合同资产"),
+                ("CONTRACT_LIAB", "合同负债"),
+                ("DEVELOP_EXPENSE", "开发支出"),
+            ]:
+                val = latest.get(col)
+                if val is not None and not (isinstance(val, float) and (val != val)):
+                    try:
+                        lines.append(f"- {label}: {float(val):,.2f}")
+                    except (ValueError, TypeError):
+                        lines.append(f"- {label}: {val}")
+            lines.append("")
+    except Exception as exc:
+        lines.append(f"<!-- balance sheet failed: {exc} -->\n")
+
+    try:
+        # ── Income statement ───────────────────────────────────────
+        pl = ak.stock_profit_sheet_by_report_em(symbol=symbol)
+        if pl is not None and len(pl) > 0:
+            latest = pl.iloc[0]
+            lines.append("### 利润表关键项（最新报告期）")
+            lines.append(f"- 报告期: {latest.get('REPORT_DATE', 'N/A')}")
+            for col, label in [
+                ("OPERATE_INCOME", "营业总收入"),
+                ("TOTAL_OPERATE_INCOME", "营业收入合计"),
+                ("OPERATE_COST", "营业成本"),
+                ("RESEARCH_EXPENSE", "研发费用"),
+                ("SALE_EXPENSE", "销售费用"),
+                ("MANAGE_EXPENSE", "管理费用"),
+                ("FINANCE_EXPENSE", "财务费用"),
+                ("OPERATE_PROFIT", "营业利润"),
+                ("TOTAL_PROFIT", "利润总额"),
+                ("PARENT_NETPROFIT", "归母净利润"),
+                ("DEDUCT_PARENT_NETPROFIT", "扣非归母净利润"),
+                ("BASIC_EPS", "基本每股收益"),
+            ]:
+                val = latest.get(col)
+                if val is not None and not (isinstance(val, float) and (val != val)):
+                    try:
+                        lines.append(f"- {label}: {float(val):,.2f}")
+                    except (ValueError, TypeError):
+                        lines.append(f"- {label}: {val}")
+            lines.append("")
+    except Exception as exc:
+        lines.append(f"<!-- income statement failed: {exc} -->\n")
+
+    try:
+        # ── Cash-flow statement ────────────────────────────────────
+        cf = ak.stock_cash_flow_sheet_by_report_em(symbol=symbol)
+        if cf is not None and len(cf) > 0:
+            latest = cf.iloc[0]
+            lines.append("### 现金流量表关键项（最新报告期）")
+            lines.append(f"- 报告期: {latest.get('REPORT_DATE', 'N/A')}")
+            for col, label in [
+                ("NETCASH_OPERATE", "经营活动现金流净额"),
+                ("NETCASH_INVEST", "投资活动现金流净额"),
+                ("NETCASH_FINANCE", "筹资活动现金流净额"),
+                ("CONSTRUCT_LONG_ASSET", "构建固定资产/无形资产支付的现金（≈资本开支）"),
+                ("TOTAL_OPERATE_INFLOW", "经营活动现金流入小计"),
+                ("TOTAL_OPERATE_OUTFLOW", "经营活动现金流出小计"),
+            ]:
+                val = latest.get(col)
+                if val is not None and not (isinstance(val, float) and (val != val)):
+                    try:
+                        lines.append(f"- {label}: {float(val):,.2f}")
+                    except (ValueError, TypeError):
+                        lines.append(f"- {label}: {val}")
+            lines.append("")
+    except Exception as exc:
+        lines.append(f"<!-- cash-flow statement failed: {exc} -->\n")
+
+    if len(lines) <= 2:
+        return ""
+    return "\n".join(lines)
+
+
 def get_a_share_fundamentals(
     symbol: Annotated[str, "ticker"],
     curr_date: Annotated[str, "reference date"],
@@ -478,6 +629,8 @@ def get_a_share_fundamentals(
     if cache_key in _fundamentals_cache:
         return _fundamentals_cache[cache_key]
 
+    parts: list[str] = []
+
     # Primary: akshare 综合财务指标 (fetch_history_fallback._financials_from_akshare)
     ok, raw, data = run_script(
         "fetch_history.py",
@@ -485,39 +638,46 @@ def get_a_share_fundamentals(
         timeout=45,
     )
     if ok and data:
-        result = (
-            f"## A-share fundamentals for {code6}\n\n"
+        parts.append(
+            f"## A-share fundamentals snapshot for {code6}\n\n"
             f"{json.dumps(data, ensure_ascii=False, indent=2)[:8000]}"
         )
-        _fundamentals_cache[cache_key] = result
-        return result
 
-    # Fallback: 东财财务摘要 + 业绩 (fetch_stock_events); ~40s typical — needs timeout >= 45
-    ok2, raw2, events = run_script(
-        "fetch_stock_events.py",
-        [
-            "--code",
-            code6,
-            "--limit",
-            "15",
-            "--skip-sentiment",
-            "--max-seconds",
-            "50",
-            "--json",
-        ],
-        timeout=55,
-    )
-    if ok2 and isinstance(events, dict):
-        perf = events.get("performance") or {}
-        result = (
-            f"## A-share fundamentals snapshot for {code6} "
-            f"(东财/akshare events · performance)\n\n"
-            f"{json.dumps(perf, ensure_ascii=False, indent=2)[:6000]}"
+    # Fallback: 东财财务摘要 + 业绩 (fetch_stock_events)
+    if not parts:
+        ok2, raw2, events = run_script(
+            "fetch_stock_events.py",
+            [
+                "--code",
+                code6,
+                "--limit",
+                "15",
+                "--skip-sentiment",
+                "--max-seconds",
+                "50",
+                "--json",
+            ],
+            timeout=55,
         )
-        _fundamentals_cache[cache_key] = result
-        return result
+        if ok2 and isinstance(events, dict):
+            perf = events.get("performance") or {}
+            parts.append(
+                f"## A-share fundamentals snapshot for {code6} "
+                f"(东财/akshare events · performance)\n\n"
+                f"{json.dumps(perf, ensure_ascii=False, indent=2)[:6000]}"
+            )
 
-    result = raw2 or raw or f"Fundamentals unavailable for {code6}"
+    # Enrichment:  akshare 三张财务报表直连 (解决之前标记为 [数据黑盒] 的字段)
+    enriched = _fetch_akshare_detailed_fundamentals(code6)
+    if enriched:
+        parts.append(
+            f"## A-share detailed financials for {code6} (akshare 东财财务报表直连)\n\n"
+            f"{enriched}"
+        )
+
+    result = "\n\n---\n\n".join(parts) if parts else (
+        raw2 if 'raw2' in dir() and raw2 else raw or f"Fundamentals unavailable for {code6}"
+    )
     _fundamentals_cache[cache_key] = result
     return result
 
