@@ -1,5 +1,8 @@
 """Tests for TradingMemoryLog — storage, deferred reflection, PM injection, legacy removal."""
 
+import builtins
+from pathlib import Path
+
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
@@ -290,6 +293,27 @@ class TestTradingMemoryLogCore:
         log.store_decision("NVDA", "2026-01-10", DECISION_BUY)
         assert log.load_entries() == []
         assert log.get_past_context("NVDA") == ""
+
+    def test_unwritable_home_log_falls_back_to_project_local(self, tmp_path, monkeypatch):
+        """Agent/sandbox may block writes under ~/.tradingagents; use cwd fallback."""
+        home_log = Path.home() / ".tradingagents" / "memory" / "trading_memory.md"
+        monkeypatch.chdir(tmp_path)
+        real_open = builtins.open
+
+        def guarded_open(file, *args, **kwargs):
+            resolved = Path(file).expanduser().resolve()
+            if resolved == home_log.resolve() and "a" in args:
+                raise PermissionError(1, "Operation not permitted")
+            return real_open(file, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "open", guarded_open)
+        log = TradingMemoryLog({"memory_log_path": str(home_log)})
+        expected = (tmp_path / ".tradingagents" / "memory" / "trading_memory.md").resolve()
+        assert log._log_path.resolve() == expected
+        log.store_decision("002594.SZ", "2026-05-25", DECISION_OVERWEIGHT)
+        assert expected.is_file()
+        entries = log.load_entries()
+        assert entries and entries[0]["ticker"] == "002594.SZ"
 
     # Rotation: opt-in cap on resolved entries
 

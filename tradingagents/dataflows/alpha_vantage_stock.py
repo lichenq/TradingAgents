@@ -1,5 +1,9 @@
 from datetime import datetime
-from .alpha_vantage_common import _make_api_request, _filter_csv_by_date_range
+from .alpha_vantage_common import (
+    _filter_csv_by_date_range,
+    _make_api_request,
+    _raise_if_api_error,
+)
 
 def get_stock(
     symbol: str,
@@ -7,8 +11,9 @@ def get_stock(
     end_date: str
 ) -> str:
     """
-    Returns raw daily OHLCV values, adjusted close values, and historical split/dividend events
-    filtered to the specified date range.
+    Returns raw daily OHLCV values filtered to the specified date range.
+
+    Uses ``TIME_SERIES_DAILY`` (free tier). ``TIME_SERIES_DAILY_ADJUSTED`` is premium-only.
 
     Args:
         symbol: The name of the equity. For example: symbol=IBM
@@ -16,7 +21,7 @@ def get_stock(
         end_date: End date in yyyy-mm-dd format
 
     Returns:
-        CSV string containing the daily adjusted time series data filtered to the date range.
+        CSV string containing the daily time series data filtered to the date range.
     """
     # Parse dates to determine the range
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
@@ -33,6 +38,6 @@ def get_stock(
         "datatype": "csv",
     }
 
-    response = _make_api_request("TIME_SERIES_DAILY_ADJUSTED", params)
-
+    response = _make_api_request("TIME_SERIES_DAILY", params)
+    _raise_if_api_error(response)
     return _filter_csv_by_date_range(response, start_date, end_date)

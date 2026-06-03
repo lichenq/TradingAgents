@@ -21,21 +21,13 @@ class Propagator:
         trade_date: str,
         asset_type: str = "stock",
         past_context: str = "",
-        instrument_context: str = "",
+        parallel_analysts: bool = False,
     ) -> Dict[str, Any]:
-        """Create the initial state for the agent graph.
-
-        ``instrument_context`` is the deterministic ticker-identity string
-        resolved once at run start (see
-        ``TradingAgentsGraph.resolve_instrument_context``). When empty, agents
-        fall back to ticker-only context via
-        ``get_instrument_context_from_state``.
-        """
-        return {
+        """Create the initial state for the agent graph."""
+        state: Dict[str, Any] = {
             "messages": [("human", company_name)],
             "company_of_interest": company_name,
             "asset_type": asset_type,
-            "instrument_context": instrument_context,
             "trade_date": str(trade_date),
             "past_context": past_context,
             "investment_debate_state": InvestDebateState(
@@ -66,7 +58,11 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            "verified_market_facts": "",
         }
+        if parallel_analysts:
+            state["analyst_threads"] = {}
+        return state
 
     def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:
         """Get arguments for the graph invocation.

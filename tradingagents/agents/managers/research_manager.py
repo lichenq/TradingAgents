@@ -7,10 +7,12 @@ from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_language_instruction,
 )
+from tradingagents.agents.utils.position_context import get_rating_scale_guidance
 from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
 )
+from tradingagents.agents.utils.verified_facts import append_verified_market_facts
 
 
 def create_research_manager(llm):
@@ -28,20 +30,16 @@ def create_research_manager(llm):
 
 ---
 
-**Rating Scale** (use exactly one):
-- **Buy**: Strong conviction in the bull thesis; recommend taking or growing the position
-- **Overweight**: Constructive view; recommend gradually increasing exposure
-- **Hold**: Balanced view; recommend maintaining the current position
-- **Underweight**: Cautious view; recommend trimming exposure
-- **Sell**: Strong conviction in the bear thesis; recommend exiting or avoiding the position
+{get_rating_scale_guidance()}
 
-Commit to a clear stance whenever the debate's strongest arguments warrant one; reserve Hold for situations where the evidence on both sides is genuinely balanced.
+Commit to a clear stance whenever the debate's strongest arguments warrant one; reserve Hold for situations where the evidence on both sides is genuinely balanced (flat portfolio: Hold means do not open).
 
 ---
 
 **Debate History:**
 {history}""" + get_language_instruction()
 
+        prompt = append_verified_market_facts(prompt, state)
         investment_plan = invoke_structured_or_freetext(
             structured_llm,
             llm,

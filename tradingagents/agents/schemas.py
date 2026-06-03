@@ -84,8 +84,9 @@ class ResearchPlan(BaseModel):
     )
     strategic_actions: str = Field(
         description=(
-            "Concrete steps for the trader to implement the recommendation, "
-            "including position sizing guidance consistent with the rating."
+            "Concrete steps for the trader. Default assumption: investor is flat "
+            "(no position)—use entry/wait/avoid language, not trim or reduce-holding "
+            "unless position_context is held. Include sizing only when recommending entry."
         ),
     )
 
@@ -134,7 +135,10 @@ class TraderProposal(BaseModel):
     )
     position_sizing: Optional[str] = Field(
         default=None,
-        description="Optional sizing guidance, e.g. '5% of portfolio'.",
+        description=(
+            "Optional sizing for a new entry when flat, e.g. '5% of portfolio'. "
+            "Omit when action is Hold/Sell (no entry)."
+        ),
     )
 
 
@@ -179,14 +183,16 @@ class PortfolioDecision(BaseModel):
 
     rating: PortfolioRating = Field(
         description=(
-            "The final position rating. Exactly one of Buy / Overweight / Hold / "
-            "Underweight / Sell, picked based on the analysts' debate."
+            "Final rating (Buy / Overweight / Hold / Underweight / Sell). "
+            "Default: investor is flat—Underweight/Sell mean do not open; Hold means wait; "
+            "Buy/Overweight mean consider entry."
         ),
     )
     executive_summary: str = Field(
         description=(
-            "A concise action plan covering entry strategy, position sizing, "
-            "key risk levels, and time horizon. Two to four sentences."
+            "Concise action plan: entry/wait/avoid when flat (no trim or reduce-holding "
+            "language unless already holding). Cover triggers, risk levels, time horizon. "
+            "Two to four sentences."
         ),
     )
     investment_thesis: str = Field(

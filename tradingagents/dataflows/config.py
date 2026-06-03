@@ -2,6 +2,7 @@ from copy import deepcopy
 from typing import Dict, Optional
 
 import tradingagents.default_config as default_config
+from tradingagents.default_config import apply_market_profile
 
 # Use default config but allow it to be overridden
 _config: Optional[Dict] = None
@@ -12,6 +13,7 @@ def initialize_config():
     global _config
     if _config is None:
         _config = deepcopy(default_config.DEFAULT_CONFIG)
+        apply_market_profile(_config)
 
 
 def set_config(config: Dict):
@@ -29,6 +31,7 @@ def set_config(config: Dict):
             _config[key].update(value)
         else:
             _config[key] = value
+    apply_market_profile(_config)
 
 
 def get_config() -> Dict:

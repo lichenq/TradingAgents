@@ -11,6 +11,17 @@ from .y_finance import (
     get_insider_transactions as get_yfinance_insider_transactions,
 )
 from .yfinance_news import get_news_yfinance, get_global_news_yfinance
+from .a_share import (
+    get_a_share_stock_data,
+    get_a_share_indicators,
+    get_a_share_fundamentals,
+    get_a_share_balance_sheet,
+    get_a_share_cashflow,
+    get_a_share_income_statement,
+    get_a_share_insider_transactions,
+    get_a_share_news,
+    get_a_share_global_news,
+)
 from .alpha_vantage import (
     get_stock as get_alpha_vantage_stock,
     get_indicator as get_alpha_vantage_indicator,
@@ -27,6 +38,10 @@ from .symbol_utils import NoMarketDataError
 
 # Configuration and routing logic
 from .config import get_config
+from tradingagents.market import (
+    cn_uses_a_share_skill,
+    effective_market_profile,
+)
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
@@ -64,6 +79,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "a_share",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -72,41 +88,50 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "a_share": get_a_share_stock_data,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "a_share": get_a_share_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "a_share": get_a_share_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "a_share": get_a_share_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "a_share": get_a_share_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "a_share": get_a_share_income_statement,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
+        "a_share": get_a_share_news,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
+        "a_share": get_a_share_global_news,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "a_share": get_a_share_insider_transactions,
     },
 }
 
@@ -141,12 +166,28 @@ def route_to_vendor(method: str, *args, **kwargs):
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
 
+    cfg = get_config()
+    ticker_hint = cfg.get("company_of_interest") or (args[0] if args else "")
+
     # Build fallback chain: primary vendors first, then remaining available vendors
     all_available_vendors = list(VENDOR_METHODS[method].keys())
     fallback_vendors = primary_vendors.copy()
-    for vendor in all_available_vendors:
-        if vendor not in fallback_vendors:
-            fallback_vendors.append(vendor)
+
+    market = effective_market_profile(str(ticker_hint), cfg)
+    if cn_uses_a_share_skill(str(ticker_hint), cfg):
+        # China A-shares: a-share-data skill only (see tradingagents/dataflows/a_share_runner.py).
+        fallback_vendors = ["a_share"] if "a_share" in VENDOR_METHODS[method] else primary_vendors
+    elif market == "us":
+        # US equities: Alpha Vantage only (no Yahoo/yfinance fallback).
+        fallback_vendors = (
+            ["alpha_vantage"]
+            if "alpha_vantage" in VENDOR_METHODS[method]
+            else primary_vendors
+        )
+    else:
+        for vendor in all_available_vendors:
+            if vendor not in fallback_vendors:
+                fallback_vendors.append(vendor)
 
     last_no_data: NoMarketDataError | None = None
     first_error: Exception | None = None

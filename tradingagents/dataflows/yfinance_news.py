@@ -131,7 +131,9 @@ def get_global_news_yfinance(
         look_back_days = config["global_news_lookback_days"]
     if limit is None:
         limit = config["global_news_article_limit"]
-    search_queries = config["global_news_queries"]
+    from tradingagents.dataflows.sector_queries import merge_news_queries
+
+    search_queries = merge_news_queries(config)
 
     all_news = []
     seen_titles = set()
