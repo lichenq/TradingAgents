@@ -20,8 +20,8 @@ from tradingagents.llm_clients import create_llm_client
 logger = logging.getLogger(__name__)
 
 MIN_REPORT_CHARS = 200
-REPORT_CHARS_PER_STOCK = 14_000
-TOTAL_REPORT_CHAR_BUDGET = 55_000
+REPORT_CHARS_PER_STOCK = 25_000
+TOTAL_REPORT_CHAR_BUDGET = 65_000
 _INCLUDE_RATINGS = frozenset({"Buy", "Overweight", "Hold"})
 
 
@@ -271,9 +271,10 @@ def curate_final_recommendations(
 5. Every candidate code must appear exactly once in picks: {codes_list}
 
 **Inclusion rules (flat book)**
-- include_in_final=true only when reviewed_rating is Buy, Overweight, or Hold AND the report supports actionable exposure.
-- Exclude (include_in_final=false) when PM/trader says wait, avoid entry, or risks dominate.
-- Prefer quality over quantity; it is valid to recommend zero stocks if none pass.
+- include_in_final=true when reviewed_rating is Buy, Overweight, or Hold AND the full report confirms actionable entry triggers at current levels.
+- Exclude (include_in_final=false) when the report's bottom-line rating is Underweight/Sell AND the PM explicitly identifies fatal risks with no compensating upside catalyst.
+- Do NOT exclude solely because the PM or trader mentions generic caution words like "wait" or "avoid chasing" — judge the net risk-reward from the full debate.
+- Aim to select 1-3 genuinely actionable names when the evidence supports entry; being too conservative is also a failure mode.
 
 **Trade date**: {trade_date}
 **Allowed ratings**: {", ".join(RATINGS_5_TIER)}

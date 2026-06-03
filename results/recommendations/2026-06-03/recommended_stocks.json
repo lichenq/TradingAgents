@@ -1,0 +1,50 @@
+{
+  "trade_date": "2026-06-03",
+  "strategy": "macd_resonance",
+  "curation": {
+    "skipped": false,
+    "method": "llm",
+    "portfolio_summary": "今日五个候选标的中，仅云意电气（300304）通过完整报告审查后纳入推荐。核心逻辑：公司正在执行股份回购（已回购1.11亿元），为股价提供明确下行保护；毛利率32.47%在板块内属中上水平；RSI已回落至中性区间，前期过热有所消化。其余四个标的均存在明显瑕疵——长华集团基本面疲弱+实控人减持（Underweight），继峰股份经营现金流深度为负+无催化剂脉冲式炒作，富特科技虽成长性亮眼但大股东减持窗口临近+MACD顶背离，威迈斯多重技术警示信号密集且基本面信息不完整。当前组合采取防守姿态，仅纳入有回购安全垫的标的。",
+    "selected_count": 1
+  },
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 5,
+    "min_volume_amount": 50000000.0,
+    "skip_curation": false
+  },
+  "all_screened_count": 10,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz300304",
+      "name": "云意电气",
+      "score": 65.0,
+      "price": 14.56,
+      "rating": "Hold",
+      "metrics": {
+        "close": 14.73,
+        "ma20": 13.235,
+        "ma60": 13.178166666666668,
+        "dif": 0.29569383076213995,
+        "dea": 0.17886080538532123,
+        "macd": 0.23366605075363744
+      },
+      "reason": "均线多头共振。60日均线向上，价格站稳 MA60 零上，MACD金叉或多头运行，日线趋势共振得分 65 分。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sz300304",
+        "trade_date": "2026-06-03"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sz300304",
+        "trade_date": "2026-06-03"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": true,
+      "curation_evidence": "完整报告显示：截至5月31日已回购816万股/金额1.11亿元，回购构成真金白银的底部支撑。Q1毛利率32.47%在汽车零部件中属中上水平。RSI已从59.66回落至50.94中性区间，前期超买部分消化。6月2日天量成交后短期存在回调概率，但回购提供下行保护。风险收益比较为均衡——回购安全垫+中期趋势向上。"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "trade_date": "2026-06-02",
+  "strategy": "macd_second_golden_cross",
+  "curation": {
+    "skipped": false,
+    "method": "llm",
+    "portfolio_summary": "今日仅推荐巨化股份（600160）一只标的进入最终组合。星环科技因极端估值叠加资金背离与基本面数据黑盒三重致命风险被判Underweight；科大讯飞因全面违反防御型市场环境铁律（PE 134×、PB 5×、经营现金流巨亏）且主力资金-14.53%大举出逃被判Underweight。巨化股份凭借Q1利润+46%的扎实业绩、机构买入评级背书、PTFE产能翻倍成长逻辑以及技术面多指标共振突破，成为今日唯一具备高确定性入场窗口的标的。组合聚焦业绩确定性最强的氟化工龙头，回避估值虚高与资金面背离的高风险品种。",
+    "selected_count": 1
+  },
+  "parameters": {
+    "top_n": 180,
+    "validate_top": 5,
+    "min_volume_amount": 50000000.0,
+    "skip_curation": false
+  },
+  "all_screened_count": 3,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz600160",
+      "name": "巨化股份",
+      "score": 88.32903299150352,
+      "price": 38.23,
+      "rating": "Buy",
+      "metrics": {
+        "close_gc1": 34.7,
+        "close_gc2": 36.32,
+        "dif_gc1": -1.2769466785570458,
+        "dif_gc2": -0.14903202557048445,
+        "gc_distance": 34
+      },
+      "reason": "出现典型日线底背离与水下二次金叉结构。第一次金叉价格 34.70 (DIF -1.277)，第二次金叉价格 36.32 (DIF -0.149)，空头力量显著衰竭。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh600160",
+        "trade_date": "2026-06-02"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh600160",
+        "trade_date": "2026-06-02"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": true,
+      "curation_evidence": "三份可用报告（市场分析师、情绪分析师、新闻分析师）一致指向买入。核心支柱：① 2026年Q1归母净利润11.73亿元同比暴增+45.93%，净利率21.62%盈利能力优异，远领先于3.75%的收入增速说明产品结构升级强劲；② 国投证券6月2日首次覆盖即给予买入-A评级，目标价42.77元较现价38.23元有约12%上行空间；③ PTFE在建产能3.7万吨/年相当于现有2.8万吨的132%，打开中期成长天花板；④ 技术面连续突破年线与半年线，MACD零轴上方金叉确认，RSI回升至54.45中性偏多区域。基本面与技术面形成共振，机构背书与产能扩张提供催化剂。虽然RM/PM辩论段因上下文截断未能获取，但已获取的全部证据一致且有力，支持在当前价位建仓。"
+    }
+  ]
+}
