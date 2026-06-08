@@ -33,6 +33,24 @@ class PositionContextTests(unittest.TestCase):
         self.assertIn("空仓", block)
         self.assertIn("不建仓", block)
 
+    @patch("tradingagents.dataflows.config.get_config")
+    def test_retail_context(self, mock_cfg):
+        mock_cfg.return_value = {"position_context": "retail", "output_language": "English"}
+        from tradingagents.agents.utils.position_context import is_retail_position
+        self.assertFalse(is_empty_position())
+        self.assertTrue(is_retail_position())
+        scale = get_rating_scale_guidance()
+        self.assertIn("retail", scale.lower())
+        self.assertIn("tranche", scale.lower())
+        self.assertNotIn("do not open", scale.lower())
+
+    @patch("tradingagents.dataflows.config.get_config")
+    def test_retail_chinese(self, mock_cfg):
+        mock_cfg.return_value = {"position_context": "retail", "output_language": "Chinese"}
+        block = get_position_assumption_instruction()
+        self.assertIn("个人投资者", block)
+        self.assertIn("分批", block)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -41,10 +41,11 @@ def has_position_holdings(config: Dict[str, Any]) -> bool:
 
 
 def ensure_held_context_for_holdings(config: Dict[str, Any]) -> None:
-    """When cost or shares are set, default position_context to held."""
+    """When cost or shares are set, upgrade empty→held (but preserve retail explicitly)."""
     if not has_position_holdings(config):
         return
-    if (config.get("position_context") or "empty").strip().lower() == "empty":
+    ctx = (config.get("position_context") or "empty").strip().lower()
+    if ctx == "empty":
         config["position_context"] = "held"
 
 

@@ -11,7 +11,11 @@ from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_language_instruction,
 )
-from tradingagents.agents.utils.position_context import get_trader_action_guidance
+from tradingagents.agents.utils.position_context import (
+    _use_chinese,
+    get_trader_action_guidance,
+    is_retail_position,
+)
 from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
@@ -28,6 +32,21 @@ def create_trader(llm):
         instrument_context = build_instrument_context(company_name, asset_type)
         investment_plan = state["investment_plan"]
 
+        pricing_guidance = ""
+        if is_retail_position():
+            if _use_chinese():
+                pricing_guidance = (
+                    " 评估时注意：机构的定价逻辑最终体现为买卖决策、影响股价。"
+                    "理解同业比价（机构是否愿意溢价买）、时滞（利润兑现前买方力量弱）、"
+                    "信息透明度（买方基础厚薄），然后判断现在是上车窗口还是需要等待。"
+                )
+            else:
+                pricing_guidance = (
+                    " Evaluate through the institutional pricing lens: peer valuation "
+                    "(will institutions pay a premium?), lead-times (weak buying pressure "
+                    "before profit delivery), information transparency (investor depth). "
+                    "Use these to gauge whether now is a valid entry window."
+                )
         user_content = (
             f"Based on a comprehensive analysis by a team of analysts, here is an investment "
             f"plan tailored for {company_name}. {instrument_context} This plan incorporates "
@@ -35,6 +54,7 @@ def create_trader(llm):
             f"social media sentiment. Use this plan as a foundation for evaluating your next "
             f"trading decision.\n\nProposed Investment Plan: {investment_plan}\n\n"
             f"Leverage these insights to make an informed and strategic decision."
+            f"{pricing_guidance}"
         )
         user_content = append_verified_market_facts(user_content, state)
 

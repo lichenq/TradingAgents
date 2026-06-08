@@ -202,8 +202,8 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
     "output_language": "English",
-    # Decision framing: "empty" (flat, no position — default) or "held" (already own the ticker)
-    "position_context": "empty",
+    # Decision framing: "retail" (individual investor — default), "empty" (flat, no position), or "held" (already own the ticker)
+    "position_context": "retail",
     "position_context_regime": "auto",
     # User holdings (optional; injected into verified_market_facts when set)
     "position_cost": None,
