@@ -59,7 +59,12 @@ def _build_gatekeeping_mandate() -> str:
 
 ### 三、个人交易纪律（严格执行）
 4. **止损纪律**：若推荐 Buy/Overweight，必须有**明确的止损价**，最大回撤控制在 8-10% 以内。
-5. **分批原则**：可以左侧建仓，但必须分步执行，单笔不超过该票计划总仓位的 50%。"""
+5. **分批原则**：可以左侧建仓，但必须分步执行，单笔不超过该票计划总仓位的 50%。
+
+### 四、Serenity 产业链门禁
+6. **功能同业约束**：估值对比优先引用「动态关联/同业对照」表中的标的；引用表外股票须说明商业模式可比性，否则降权。
+7. **卡脖子论证**：若以「卡脖子/不可替代」为主逻辑，须证明高替代成本或供给弹性低；否则不得作为估值溢价主因。
+8. **市占/客户断言**：市占率、核心客户供货须 L1/L2 证据；仅 L3/L4 时最多作观察理由，不得支撑 Buy/Overweight。"""
 
     return """## 【Fact-Auditing & Logic Gatekeeping Mandate (事实合规与逻辑门禁)】
 You are the ultimate guarantor of truth and risk discipline for the fund. When synthesizing the debate, you MUST:

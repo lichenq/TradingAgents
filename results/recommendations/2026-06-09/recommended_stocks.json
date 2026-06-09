@@ -1,0 +1,215 @@
+{
+  "trade_date": "2026-06-09",
+  "strategy": "trend_pullback",
+  "curation": {
+    "skipped": false,
+    "method": "legacy_after_error",
+    "error": "'NoneType' object has no attribute 'picks'"
+  },
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 8,
+    "min_volume_amount": 50000000.0,
+    "skip_curation": false
+  },
+  "all_screened_count": 24,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz603986",
+      "name": "兆易创新",
+      "score": 20.323970329231944,
+      "price": 481.35,
+      "rating": "Overweight",
+      "metrics": {
+        "close": 474.01,
+        "ma10": 491.66499999999996,
+        "ma30": 408.6176666666667,
+        "rsi14": 60.69415786394013
+      },
+      "reason": "日线均线 MA10(491.66) > MA30(408.62) 处于上升趋势，价格回踩至 474.01 附近，RSI(60.7) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh603986",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh603986",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz688347",
+      "name": "华虹宏力",
+      "score": 24.40546644107673,
+      "price": 214.92,
+      "rating": "Hold",
+      "metrics": {
+        "close": 214.92,
+        "ma10": 228.42999999999998,
+        "ma30": 183.6173333333333,
+        "rsi14": 60.18437225636523
+      },
+      "reason": "日线均线 MA10(228.43) > MA30(183.62) 处于上升趋势，价格回踩至 214.92 附近，RSI(60.2) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh688347",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh688347",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz600584",
+      "name": "长电科技",
+      "score": 21.739602899855615,
+      "price": 74.1,
+      "rating": "Hold",
+      "metrics": {
+        "close": 74.1,
+        "ma10": 78.42099999999999,
+        "ma30": 64.417,
+        "rsi14": 57.4032318677189
+      },
+      "reason": "日线均线 MA10(78.42) > MA30(64.42) 处于上升趋势，价格回踩至 74.10 附近，RSI(57.4) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh600584",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh600584",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz601991",
+      "name": "大唐发电",
+      "score": 21.65243571393316,
+      "price": 7.49,
+      "rating": "Hold",
+      "metrics": {
+        "close": 7.27,
+        "ma10": 8.216,
+        "ma30": 6.753666666666667,
+        "rsi14": 41.704035874439455
+      },
+      "reason": "日线均线 MA10(8.22) > MA30(6.75) 处于上升趋势，价格回踩至 7.27 附近，RSI(41.7) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh601991",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh601991",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz300433",
+      "name": "蓝思科技",
+      "score": 19.471676790507118,
+      "price": 42.41,
+      "rating": "Hold",
+      "metrics": {
+        "close": 42.52,
+        "ma10": 42.287,
+        "ma30": 35.395,
+        "rsi14": 67.97915460335841
+      },
+      "reason": "日线均线 MA10(42.29) > MA30(35.40) 处于上升趋势，价格回踩至 42.52 附近，RSI(68.0) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sz300433",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sz300433",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz600726",
+      "name": "华电能源",
+      "score": 19.22309488431331,
+      "price": 8.92,
+      "rating": "Hold",
+      "metrics": {
+        "close": 8.91,
+        "ma10": 9.361,
+        "ma30": 7.8516666666666675,
+        "rsi14": 65.65656565656566
+      },
+      "reason": "日线均线 MA10(9.36) > MA30(7.85) 处于上升趋势，价格回踩至 8.91 附近，RSI(65.7) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh600726",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh600726",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    },
+    {
+      "code": "sz002185",
+      "name": "华天科技",
+      "score": 18.246846959904616,
+      "price": 17.41,
+      "rating": "Hold",
+      "metrics": {
+        "close": 17.41,
+        "ma10": 18.845,
+        "ma30": 15.937000000000001,
+        "rsi14": 55.406360424028264
+      },
+      "reason": "日线均线 MA10(18.84) > MA30(15.94) 处于上升趋势，价格回踩至 17.41 附近，RSI(55.4) 处于健康区间。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sz002185",
+        "trade_date": "2026-06-09"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sz002185",
+        "trade_date": "2026-06-09"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": false,
+      "curation_evidence": ""
+    }
+  ]
+}

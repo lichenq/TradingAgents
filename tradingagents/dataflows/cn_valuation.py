@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import subprocess
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from tradingagents.dataflows.cn_prefetch import _cache, get_prefetched
+from tradingagents.dataflows.peer_discovery import (
+    discover_functional_peers,
+    format_association_markdown,
+)
 from tradingagents.market import normalize_a_share_code
+
+logger = logging.getLogger(__name__)
 
 _TENCENT_URL = "https://qt.gtimg.cn/q="
 
@@ -146,61 +153,28 @@ def _fetch_events_eps(code6: str) -> Optional[Dict[str, Any]]:
     return _parse_events_eps(raw or "")
 
 
-def _auto_discover_peer_codes(ticker: str, config: dict, limit: int = 4) -> List[str]:
-    """Automatically discover 3-4 top peer stock codes in the same Eastmoney industry sector."""
-    from tradingagents.dataflows.sector_queries import fetch_sector_payload
-    from tradingagents.dataflows.a_share_runner import run_script
-
-    payload = fetch_sector_payload(ticker)
-    if not payload or not isinstance(payload, dict):
-        return []
-    industry = (payload.get("industry") or "").strip()
-    if not industry:
-        return []
-
-    # Map sector/industry name via central mapping table
-    from tradingagents.dataflows.sector_mapping import (
-        get_danginvest_boards,
-        resolve,
-    )
-    resolved_industry = resolve(industry)
-    # Prefer DangInvest board name for the API call
-    mapped_boards = get_danginvest_boards(resolved_industry)
-    if mapped_boards:
-        resolved_industry = mapped_boards[0]
-
-    ok, raw, board_detail = run_script(
-        "fetch_realtime.py",
-        ["--boards-detail", "--boards-group-key", resolved_industry, "--boards-items-limit", "10", "--json"],
-        timeout=25
-    )
-    if not ok or not isinstance(board_detail, dict):
-        return []
-
-    items = (board_detail.get("data") or {}).get("items") or []
-    peers = []
-    my_code6 = normalize_a_share_code(ticker)
-    for item in items:
-        code = item.get("code") or ""
-        code6 = "".join(ch for ch in code if ch.isdigit())[-6:]
-        if code6 and code6 != my_code6:
-            peers.append(code6)
-            if len(peers) >= limit:
-                break
-    return peers
-
-
-def _peer_codes(config: dict, ticker: str = "") -> List[str]:
+def _resolve_peer_context(
+    config: dict,
+    ticker: str,
+    *,
+    limit: int = 4,
+) -> Tuple[List[str], Dict[str, Any]]:
+    """Return peer codes and Serenity association metadata."""
     peers = config.get("cn_valuation_peers") or []
     if isinstance(peers, str):
         peers = [p.strip() for p in peers.split(",") if p.strip()]
-    resolved = [normalize_a_share_code(p) for p in peers if p]
-    if not resolved and ticker:
-        try:
-            resolved = _auto_discover_peer_codes(ticker, config)
-        except Exception as e:
-            logger.warning(f"Failed to auto-discover peers for {ticker}: {e}")
-    return resolved
+    manual = [normalize_a_share_code(p) for p in peers if p]
+    if manual:
+        return manual, {}
+
+    if not ticker:
+        return [], {}
+
+    try:
+        return discover_functional_peers(ticker, limit=limit)
+    except Exception as exc:
+        logger.warning("Failed to auto-discover functional peers for %s: %s", ticker, exc)
+        return [], {}
 
 
 def fetch_cn_valuation_payload(
@@ -213,7 +187,8 @@ def fetch_cn_valuation_payload(
     ok is False when price or pe_ttm cannot be obtained from market data.
     """
     code6 = normalize_a_share_code(ticker)
-    all_codes = [code6, *_peer_codes(config, ticker)]
+    peer_codes, association = _resolve_peer_context(config, ticker)
+    all_codes = [code6, *peer_codes]
     try:
         quotes = fetch_tencent_valuations(all_codes)
     except Exception as exc:
@@ -234,6 +209,7 @@ def fetch_cn_valuation_payload(
         "primary": primary,
         "latest_eps": eps_info,
         "peers": peers,
+        "association": association,
         "disclaimer": (
             "pe_ttm 来自腾讯行情字段（滚动市盈率）；pe_annualized_q_eps 为 Q1 基本 EPS×4 年化口径，"
             "非公告 TTM。禁止将净利润同比增速（%）当作市盈率（倍）。"
@@ -269,9 +245,13 @@ def format_valuation_markdown(payload: Dict[str, Any]) -> str:
             f"- **最近财报基本 EPS**: {eps['basic_eps']}（报告期 {eps.get('report_period', 'N/A')}）"
         )
     peers = payload.get("peers") or {}
+    association_md = format_association_markdown(payload.get("association") or {})
+    if association_md:
+        lines.append("")
+        lines.append(association_md)
     if peers:
         lines.append("")
-        lines.append("### 同业对照（同次预取）")
+        lines.append("### 同业对照（功能同业，同次预取）")
         lines.append("")
         lines.append("| 代码 | 名称 | 现价 | TTM PE |")
         lines.append("|------|------|------|--------|")

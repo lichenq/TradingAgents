@@ -1,0 +1,50 @@
+{
+  "trade_date": "2026-06-08",
+  "strategy": "macd_resonance",
+  "curation": {
+    "skipped": false,
+    "method": "llm",
+    "portfolio_summary": "今日仅推荐中天科技(600522)一只标的，属于光通信/数据中心赛道中技术面与基本面共振最好的选择。其余五只均存在致命缺陷：688549/688146六氟化钨叙事已被公司公告证伪；600487高位放量滞涨需等待回调；002138冲高回落信号不完整；300319抛物线赶顶风险极高。中天科技MACD金叉重启、RSI仅59.54、放量突破历史新高配合15亿实单催化，是今日唯一满足买入条件的品种。",
+    "selected_count": 1
+  },
+  "parameters": {
+    "top_n": 120,
+    "validate_top": 6,
+    "min_volume_amount": 50000000.0,
+    "skip_curation": false
+  },
+  "all_screened_count": 40,
+  "pruned": [],
+  "recommendations": [
+    {
+      "code": "sz600522",
+      "name": "中天科技",
+      "score": 70.0,
+      "price": 49.53,
+      "rating": "Buy",
+      "metrics": {
+        "close": 49.53,
+        "ma20": 43.322500000000005,
+        "ma60": 34.91016666666667,
+        "dif": 2.624711438996613,
+        "dea": 2.3775556674439158,
+        "macd": 0.49431154310539416
+      },
+      "reason": "均线多头共振。60日均线向上，价格站稳 MA60 零上，MACD金叉或多头运行，日线趋势共振得分 70 分。",
+      "report_paths": {
+        "source": "sqlite",
+        "ticker": "sh600522",
+        "trade_date": "2026-06-08"
+      },
+      "report_storage": {
+        "source": "sqlite",
+        "ticker": "sh600522",
+        "trade_date": "2026-06-08"
+      },
+      "deep_analysis_source": "graph",
+      "skipped_deep_analysis": false,
+      "curation_reviewed": true,
+      "curation_evidence": "MACD由负转正(+0.516)即将完成零轴金叉，RSI仅59.54远未过热，放量突破历史新高且成交量为数据区间之最(5.13亿股)。基本面有15.18亿元数据中心MPO光纤大单催化(6月5日公告)，Q1净利润9.19亿元业绩稳健。舆情排名登顶全市场第1但铁杆粉丝占比仍超71%，情绪基础稳固。市场分析师给出明确BUY建议，分三批入场、总仓位≤15%。"
+    }
+  ]
+}
