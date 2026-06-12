@@ -10,6 +10,7 @@ from tradingagents.dataflows.sector_mapping import (
     get_danginvest_boards,
     get_eastmoney_concepts,
     get_eastmoney_industries,
+    get_match_names,
     get_search_keywords,
     resolve,
 )
@@ -94,3 +95,24 @@ class TestSectorMapping(unittest.TestCase):
         self.assertGreater(len(names), 5)
         self.assertIn("半导体", names)
         self.assertIn("人形机器人", names)
+        self.assertIn("电池", names)
+
+    def test_get_match_names_military(self):
+        names = get_match_names("军工装备")
+        self.assertIn("军工装备", names)
+        self.assertIn("航空装备", names)
+        self.assertIn("军工电子", names)
+
+    def test_get_match_names_battery(self):
+        names = get_match_names("电池")
+        self.assertIn("电池", names)
+        self.assertIn("能源金属", names)
+
+    def test_get_match_names_precious_metals(self):
+        names = get_match_names("贵金属")
+        self.assertIn("贵金属", names)
+        self.assertIn("小金属", names)
+
+
+if __name__ == "__main__":
+    unittest.main()

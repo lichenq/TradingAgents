@@ -1,0 +1,11 @@
+{
+  "run_id": "2026-06-12_121501",
+  "node_mode": "3",
+  "focus": "sector_rotation_only",
+  "sector_summary": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_121501_sectors.json",
+  "finished_at": "2026-06-12T12:15:03+08:00",
+  "log": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_121501.log",
+  "steps": {
+    "3":{"name":"sector-rotation","ok":true,"elapsed_s":2,"output":"/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_121501_sectors.json"}
+  }
+}

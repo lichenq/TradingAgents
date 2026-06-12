@@ -1,0 +1,11 @@
+{
+  "run_id": "2026-06-12_124300",
+  "node_mode": "all",
+  "focus": "sector_rotation_only",
+  "sector_summary": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_124300_sectors.json",
+  "finished_at": "2026-06-12T12:44:37+08:00",
+  "log": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_124300.log",
+  "steps": {
+    "1":{"name":"index","ok":true,"elapsed_s":7},"1b":{"name":"limit-stats","ok":true,"elapsed_s":1},"2":{"name":"market-news","ok":true,"elapsed_s":6},"3":{"name":"sector-rotation","ok":true,"elapsed_s":34,"output":"/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_124300_sectors.json"},"4":{"name":"ta-recommend","ok":true,"skipped":true},"5":{"name":"consecutive-limit","ok":true,"merged":true},"6":{"name":"refresh-index","ok":true,"elapsed_s":4},"7":{"name":"theme-check","ok":true,"elapsed_s":0,"note":"manual_or_compare_prev_run"},"8":{"name":"auction-index","ok":true,"elapsed_s":4},"9":{"name":"open-confirm","ok":true,"elapsed_s":25,"output":"/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_124300_open_sectors.json","compare_with":"/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_121845_open_sectors.json"},"10":{"name":"intraday-fund-flow","ok":true,"elapsed_s":16}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "run_id": "2026-06-12_152504",
+  "node_mode": "11",
+  "focus": "sector_rotation_only",
+  "sector_summary": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_152504_sectors.json",
+  "finished_at": "2026-06-12T15:51:12+08:00",
+  "log": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_152504.log",
+  "steps": {
+    "11":{"name":"deep-fill","ok":true,"elapsed_s":1567}
+  }
+}

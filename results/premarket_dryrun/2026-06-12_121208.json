@@ -1,0 +1,23 @@
+{
+  "run_id": "2026-06-12_121208",
+  "node_mode": "morning",
+  "finished_at": "2026-06-12T12:12:33+08:00",
+  "log": "/Users/chenqing/Projects/TradingAgents/results/premarket_dryrun/2026-06-12_121208.log",
+  "steps": {
+    [12:12:08] ▶ Node 6: refresh-index+holding
+[12:12:14] ✓ Node 6 done (6-0 s)
+"6":{"name":"refresh-index+holding","ok":true,"elapsed_s":6},[12:12:14] ▶ Node 6b: holding-quote
+[12:12:15] ✓ Node 6b done (7-6 s)
+"6b":{"name":"holding-quote","ok":true,"elapsed_s":1},"7":{"name":"pre-meeting","ok":true,"elapsed_s":0,"note":"manual_review_log"},[12:12:15] ▶ Node 8: auction-proxy-quote
+[12:12:16] ✓ Node 8 done (8-7 s)
+"8":{"name":"auction-proxy-quote","ok":true,"elapsed_s":1},[12:12:16] ▶ Node 9: limit-up-pool
+[12:12:17] ✓ Node 9 done (9-8 s)
+"9":{"name":"limit-up-pool","ok":true,"elapsed_s":1},[12:12:17] ▶ Node 9b: industry-fund-flow
+[12:12:29] ✓ Node 9b done (21-9 s)
+"9b":{"name":"industry-fund-flow","ok":true,"elapsed_s":12},[12:12:29] ▶ Node 10: intraday-check
+[12:12:33] ✓ Node 10 done (25-21 s)
+"10":{"name":"intraday-check","ok":true,"elapsed_s":4},[12:12:33] ▶ Node 10b: fund-flow
+[12:12:33] ✓ Node 10b done (25-25 s)
+"10b":{"name":"fund-flow","ok":true,"elapsed_s":0}
+  }
+}

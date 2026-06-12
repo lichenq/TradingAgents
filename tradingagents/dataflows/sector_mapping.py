@@ -22,6 +22,10 @@ Usage::
     # Get search keywords for raw query list expansion
     expanded = SectorMapping.expand_queries(["A股 半导体 板块 政策", "A股 银行 板块"])
     # → ["A股 半导体 板块 政策", "A股 芯片 板块 政策", ..., "A股 银行 板块"]
+
+    # Match limit-up pool industries for a fund-flow sector name
+    names = SectorMapping.get_match_names("军工装备")
+    # → ["军工装备", "航空装备", "军工电子", ...]
 """
 
 from __future__ import annotations
@@ -175,6 +179,42 @@ def get_eastmoney_concepts(canonical: str) -> List[str]:
     src = row.get("source") or {}
     concepts = src.get("eastmoney_concept") or []
     return concepts if isinstance(concepts, list) else [concepts]
+
+
+def get_match_names(name: str) -> List[str]:
+    """Return industry/board names used to match limit-up pool rows for a fund-flow sector.
+
+    Includes the input name, canonical, all source aliases, and optional
+    ``related_limit_up_industries`` from the mapping row.
+    """
+    _build()
+    name = (name or "").strip()
+    if not name:
+        return []
+
+    canonical = _BY_ALIAS.get(name, name)
+    names: Set[str] = {name, canonical}
+    row = _BY_CANONICAL.get(canonical)
+
+    if row:
+        src = row.get("source") or {}
+        for key in ("eastmoney_industry", "eastmoney_concept", "danginvest_board"):
+            vals = src.get(key) or []
+            if isinstance(vals, str):
+                vals = [vals]
+            for n in vals:
+                n = (n or "").strip()
+                if n:
+                    names.add(n)
+        for rel in row.get("related_limit_up_industries") or []:
+            rel = (rel or "").strip()
+            if rel:
+                names.add(rel)
+        for alias, canon in _BY_ALIAS.items():
+            if canon == canonical and alias:
+                names.add(alias)
+
+    return sorted(names)
 
 
 def all_canonical_names() -> List[str]:

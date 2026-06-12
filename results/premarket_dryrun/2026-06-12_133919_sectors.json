@@ -1,0 +1,330 @@
+{
+  "ok": true,
+  "market_limit_up_count": 95,
+  "limit_up_pool_sample_size": 20,
+  "top_sectors_by_fund_flow": [
+    {
+      "industry": "证券",
+      "main_net_inflow_yi": 67.12,
+      "change_pct": 3.94,
+      "rank": 1,
+      "limit_up_leaders": []
+    },
+    {
+      "industry": "电池",
+      "main_net_inflow_yi": 55.57,
+      "change_pct": 3.05,
+      "rank": 2,
+      "limit_up_leaders": [
+        {
+          "code": "002733",
+          "name": "雄韬股份",
+          "change_pct": 10.0031862259
+        }
+      ]
+    },
+    {
+      "industry": "银行",
+      "main_net_inflow_yi": 40.93,
+      "change_pct": 1.02,
+      "rank": 3,
+      "limit_up_leaders": []
+    },
+    {
+      "industry": "小金属",
+      "main_net_inflow_yi": 36.78,
+      "change_pct": 3.65,
+      "rank": 4,
+      "limit_up_leaders": [
+        {
+          "code": "601958",
+          "name": "金钼股份",
+          "change_pct": 10.0
+        },
+        {
+          "code": "001257",
+          "name": "盛龙股份",
+          "change_pct": 9.9920701981
+        }
+      ]
+    },
+    {
+      "industry": "化学制药",
+      "main_net_inflow_yi": 17.78,
+      "change_pct": 2.27,
+      "rank": 5,
+      "limit_up_leaders": [
+        {
+          "code": "002742",
+          "name": "冀衡医药",
+          "change_pct": 10.0263853073
+        }
+      ]
+    },
+    {
+      "industry": "元件",
+      "main_net_inflow_yi": 17.69,
+      "change_pct": 0.35,
+      "rank": 6,
+      "limit_up_leaders": [
+        {
+          "code": "603738",
+          "name": "泰晶科技",
+          "change_pct": 9.9914970398
+        }
+      ]
+    },
+    {
+      "industry": "保险",
+      "main_net_inflow_yi": 15.6,
+      "change_pct": 3.26,
+      "rank": 7,
+      "limit_up_leaders": []
+    },
+    {
+      "industry": "工业金属",
+      "main_net_inflow_yi": 14.91,
+      "change_pct": 5.39,
+      "rank": 8,
+      "limit_up_leaders": [
+        {
+          "code": "002203",
+          "name": "海亮股份",
+          "change_pct": 9.9953069687
+        },
+        {
+          "code": "000969",
+          "name": "安泰科技",
+          "change_pct": 9.9820146561
+        },
+        {
+          "code": "600497",
+          "name": "驰宏锌锗",
+          "change_pct": 9.9526071548
+        }
+      ]
+    }
+  ],
+  "limit_up_clusters": [
+    {
+      "industry": "化学制品",
+      "count": 2,
+      "stocks": [
+        {
+          "code": "603065",
+          "name": "宿迁联盛",
+          "change_pct": 10.0323629379
+        },
+        {
+          "code": "600500",
+          "name": "中化国际",
+          "change_pct": 9.9861297607
+        }
+      ]
+    },
+    {
+      "industry": "小金属",
+      "count": 2,
+      "stocks": [
+        {
+          "code": "601958",
+          "name": "金钼股份",
+          "change_pct": 10.0
+        },
+        {
+          "code": "001257",
+          "name": "盛龙股份",
+          "change_pct": 9.9920701981
+        }
+      ]
+    },
+    {
+      "industry": "汽车零部",
+      "count": 2,
+      "stocks": [
+        {
+          "code": "603335",
+          "name": "迪生力",
+          "change_pct": 9.9726772308
+        },
+        {
+          "code": "002976",
+          "name": "瑞玛精密",
+          "change_pct": 10.0033454895
+        }
+      ]
+    },
+    {
+      "industry": "工业金属",
+      "count": 2,
+      "stocks": [
+        {
+          "code": "002203",
+          "name": "海亮股份",
+          "change_pct": 9.9953069687
+        },
+        {
+          "code": "600497",
+          "name": "驰宏锌锗",
+          "change_pct": 9.9526071548
+        }
+      ]
+    },
+    {
+      "industry": "军工电子",
+      "count": 2,
+      "stocks": [
+        {
+          "code": "000547",
+          "name": "航天发展",
+          "change_pct": 10.0159835815
+        },
+        {
+          "code": "002935",
+          "name": "天奥电子",
+          "change_pct": 10.0099105835
+        }
+      ]
+    },
+    {
+      "industry": "航空装备",
+      "count": 1,
+      "stocks": [
+        {
+          "code": "000768",
+          "name": "中航西飞",
+          "change_pct": 10.0096244812
+        }
+      ]
+    },
+    {
+      "industry": "金属新材",
+      "count": 1,
+      "stocks": [
+        {
+          "code": "000969",
+          "name": "安泰科技",
+          "change_pct": 9.9820146561
+        }
+      ]
+    },
+    {
+      "industry": "元件",
+      "count": 1,
+      "stocks": [
+        {
+          "code": "603738",
+          "name": "泰晶科技",
+          "change_pct": 9.9914970398
+        }
+      ]
+    }
+  ],
+  "consecutive_limit_leaders": [
+    {
+      "code": "002971",
+      "name": "和远气体",
+      "industry": "化学制品",
+      "yesterday_boards": 3,
+      "change_pct": 9.3080568314
+    },
+    {
+      "code": "002409",
+      "name": "雅克科技",
+      "industry": "半导体",
+      "yesterday_boards": 2,
+      "change_pct": 0.6601883769
+    },
+    {
+      "code": "600178",
+      "name": "东安动力",
+      "industry": "汽车零部",
+      "yesterday_boards": 2,
+      "change_pct": -2.2705771923
+    },
+    {
+      "code": "002842",
+      "name": "翔鹭钨业",
+      "industry": "小金属",
+      "yesterday_boards": 1,
+      "change_pct": 6.3294358253
+    },
+    {
+      "code": "603399",
+      "name": "永杉锂业",
+      "industry": "能源金属",
+      "yesterday_boards": 1,
+      "change_pct": 5.6830029488
+    },
+    {
+      "code": "002378",
+      "name": "章源钨业",
+      "industry": "小金属",
+      "yesterday_boards": 1,
+      "change_pct": 5.3820991516
+    },
+    {
+      "code": "688419",
+      "name": "耐科装备",
+      "industry": "半导体",
+      "yesterday_boards": 1,
+      "change_pct": 5.1561365128
+    },
+    {
+      "code": "603991",
+      "name": "领先股份",
+      "industry": "半导体",
+      "yesterday_boards": 1,
+      "change_pct": 3.1611344814
+    },
+    {
+      "code": "002824",
+      "name": "和胜股份",
+      "industry": "工业金属",
+      "yesterday_boards": 1,
+      "change_pct": 3.1531531811
+    },
+    {
+      "code": "002407",
+      "name": "多氟多",
+      "industry": "化学制品",
+      "yesterday_boards": 1,
+      "change_pct": 2.0947892666
+    },
+    {
+      "code": "002913",
+      "name": "奥士康",
+      "industry": "元件",
+      "yesterday_boards": 1,
+      "change_pct": 1.4542810917
+    },
+    {
+      "code": "688545",
+      "name": "XD兴福电",
+      "industry": "电子化学",
+      "yesterday_boards": 1,
+      "change_pct": 0.9595087767
+    },
+    {
+      "code": "002490",
+      "name": "山东墨龙",
+      "industry": "专用设备",
+      "yesterday_boards": 1,
+      "change_pct": 0.7009345293
+    },
+    {
+      "code": "600459",
+      "name": "贵研铂业",
+      "industry": "小金属",
+      "yesterday_boards": 1,
+      "change_pct": 0.3185981512
+    },
+    {
+      "code": "000921",
+      "name": "海信家电",
+      "industry": "白色家电",
+      "yesterday_boards": 1,
+      "change_pct": -0.5460751057
+    }
+  ]
+}

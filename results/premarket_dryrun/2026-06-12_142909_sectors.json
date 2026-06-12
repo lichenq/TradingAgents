@@ -1,0 +1,697 @@
+{
+  "ok": true,
+  "market_limit_up_count": 90,
+  "limit_up_pool_size": 90,
+  "limit_up_pool_sample_size": 90,
+  "top_sectors_by_fund_flow": [
+    {
+      "industry": "证券",
+      "main_net_inflow_yi": 71.1,
+      "change_pct": 3.87,
+      "rank": 1,
+      "limit_up_leaders": [],
+      "board_picks": [],
+      "ta_pullback": []
+    },
+    {
+      "industry": "电池",
+      "main_net_inflow_yi": 54.4,
+      "change_pct": 2.82,
+      "rank": 2,
+      "limit_up_leaders": [
+        {
+          "code": "002733",
+          "name": "雄韬股份",
+          "change_pct": 10.0031862259
+        },
+        {
+          "code": "002812",
+          "name": "恩捷股份",
+          "change_pct": 10.0
+        }
+      ],
+      "board_picks": [
+        {
+          "code": "301150",
+          "name": "中一科技",
+          "change_pct": 8.51
+        },
+        {
+          "code": "300438",
+          "name": "鹏辉能源",
+          "change_pct": 7.34
+        },
+        {
+          "code": "688819",
+          "name": "天能股份",
+          "change_pct": 7.11
+        }
+      ],
+      "ta_pullback": []
+    },
+    {
+      "industry": "银行",
+      "main_net_inflow_yi": 46.95,
+      "change_pct": 1.13,
+      "rank": 3,
+      "limit_up_leaders": [],
+      "board_picks": [
+        {
+          "code": "000001",
+          "name": "平安银行",
+          "change_pct": 2.65
+        },
+        {
+          "code": "600928",
+          "name": "西安银行",
+          "change_pct": 2.58
+        },
+        {
+          "code": "603323",
+          "name": "苏农银行",
+          "change_pct": 2.31
+        }
+      ],
+      "ta_pullback": []
+    },
+    {
+      "industry": "小金属",
+      "main_net_inflow_yi": 39.5,
+      "change_pct": 3.89,
+      "rank": 4,
+      "limit_up_leaders": [
+        {
+          "code": "601958",
+          "name": "金钼股份",
+          "change_pct": 10.0
+        },
+        {
+          "code": "001257",
+          "name": "盛龙股份",
+          "change_pct": 9.9920701981
+        }
+      ],
+      "board_picks": [
+        {
+          "code": "000960",
+          "name": "锡业股份",
+          "change_pct": 8.81
+        },
+        {
+          "code": "600301",
+          "name": "华锡有色",
+          "change_pct": 7.62
+        },
+        {
+          "code": "000657",
+          "name": "中钨高新",
+          "change_pct": 5.49
+        }
+      ],
+      "ta_pullback": [
+        {
+          "code": "600301",
+          "name": "华锡有色",
+          "change_pct": 7.62,
+          "close": 58.54,
+          "score": 0.0432,
+          "signal": "trend_pullback"
+        }
+      ]
+    },
+    {
+      "industry": "元件",
+      "main_net_inflow_yi": 18.68,
+      "change_pct": 0.26,
+      "rank": 5,
+      "limit_up_leaders": [
+        {
+          "code": "301176",
+          "name": "逸豪新材",
+          "change_pct": 19.991519928
+        },
+        {
+          "code": "002552",
+          "name": "宝鼎科技",
+          "change_pct": 10.0056209564
+        },
+        {
+          "code": "603738",
+          "name": "泰晶科技",
+          "change_pct": 9.9914970398
+        },
+        {
+          "code": "600601",
+          "name": "方正科技",
+          "change_pct": 9.9829349518
+        }
+      ],
+      "board_picks": [
+        {
+          "code": "688183",
+          "name": "生益电子",
+          "change_pct": 9.22
+        },
+        {
+          "code": "688020",
+          "name": "方邦股份",
+          "change_pct": 8.47
+        },
+        {
+          "code": "300657",
+          "name": "弘信电子",
+          "change_pct": 6.54
+        }
+      ],
+      "ta_pullback": []
+    },
+    {
+      "industry": "保险",
+      "main_net_inflow_yi": 16.41,
+      "change_pct": 3.62,
+      "rank": 6,
+      "limit_up_leaders": [],
+      "board_picks": [],
+      "ta_pullback": []
+    },
+    {
+      "industry": "化学制药",
+      "main_net_inflow_yi": 16.13,
+      "change_pct": 1.98,
+      "rank": 7,
+      "limit_up_leaders": [
+        {
+          "code": "002742",
+          "name": "冀衡医药",
+          "change_pct": 10.0263853073
+        },
+        {
+          "code": "603976",
+          "name": "正川股份",
+          "change_pct": 10.0
+        },
+        {
+          "code": "603014",
+          "name": "威高血净",
+          "change_pct": 9.9969882965
+        }
+      ],
+      "board_picks": [
+        {
+          "code": "688382",
+          "name": "益方生物-U",
+          "change_pct": 8.84
+        },
+        {
+          "code": "688331",
+          "name": "荣昌生物",
+          "change_pct": 8.75
+        },
+        {
+          "code": "600881",
+          "name": "亚泰集团",
+          "change_pct": 7.74
+        }
+      ],
+      "ta_pullback": []
+    },
+    {
+      "industry": "贵金属",
+      "main_net_inflow_yi": 14.23,
+      "change_pct": 5.37,
+      "rank": 8,
+      "limit_up_leaders": [
+        {
+          "code": "000506",
+          "name": "招金黄金",
+          "change_pct": 10.0160255432
+        },
+        {
+          "code": "601958",
+          "name": "金钼股份",
+          "change_pct": 10.0
+        },
+        {
+          "code": "001257",
+          "name": "盛龙股份",
+          "change_pct": 9.9920701981
+        }
+      ],
+      "board_picks": [
+        {
+          "code": "600988",
+          "name": "赤峰黄金",
+          "change_pct": 8.1
+        },
+        {
+          "code": "300139",
+          "name": "晓程科技",
+          "change_pct": 5.99
+        },
+        {
+          "code": "002237",
+          "name": "恒邦股份",
+          "change_pct": 5.29
+        }
+      ],
+      "ta_pullback": []
+    }
+  ],
+  "limit_up_clusters": [
+    {
+      "industry": "工业金属",
+      "count": 10,
+      "stocks": [
+        {
+          "code": "002203",
+          "name": "海亮股份",
+          "change_pct": 9.9953069687
+        },
+        {
+          "code": "600497",
+          "name": "驰宏锌锗",
+          "change_pct": 9.9526071548
+        },
+        {
+          "code": "601609",
+          "name": "金田股份",
+          "change_pct": 9.991235733
+        },
+        {
+          "code": "000751",
+          "name": "锌业股份",
+          "change_pct": 9.9352054596
+        },
+        {
+          "code": "000758",
+          "name": "中色股份",
+          "change_pct": 9.9526071548
+        }
+      ]
+    },
+    {
+      "industry": "汽车零部",
+      "count": 7,
+      "stocks": [
+        {
+          "code": "603335",
+          "name": "迪生力",
+          "change_pct": 9.9726772308
+        },
+        {
+          "code": "002976",
+          "name": "瑞玛精密",
+          "change_pct": 10.0033454895
+        },
+        {
+          "code": "002085",
+          "name": "万丰奥威",
+          "change_pct": 10.0404853821
+        },
+        {
+          "code": "002190",
+          "name": "成飞集成",
+          "change_pct": 9.9959363937
+        },
+        {
+          "code": "002997",
+          "name": "瑞鹄模具",
+          "change_pct": 9.9962558746
+        }
+      ]
+    },
+    {
+      "industry": "化学制品",
+      "count": 6,
+      "stocks": [
+        {
+          "code": "603065",
+          "name": "宿迁联盛",
+          "change_pct": 10.0323629379
+        },
+        {
+          "code": "002971",
+          "name": "和远气体",
+          "change_pct": 10.009478569
+        },
+        {
+          "code": "603120",
+          "name": "肯特催化",
+          "change_pct": 10.0038032532
+        },
+        {
+          "code": "002597",
+          "name": "金禾实业",
+          "change_pct": 9.99010849
+        },
+        {
+          "code": "603020",
+          "name": "爱普股份",
+          "change_pct": 10.0421943665
+        }
+      ]
+    },
+    {
+      "industry": "航空装备",
+      "count": 5,
+      "stocks": [
+        {
+          "code": "000768",
+          "name": "中航西飞",
+          "change_pct": 10.0096244812
+        },
+        {
+          "code": "600391",
+          "name": "航发科技",
+          "change_pct": 9.9905748367
+        },
+        {
+          "code": "300581",
+          "name": "晨曦航空",
+          "change_pct": 19.9635372162
+        },
+        {
+          "code": "600862",
+          "name": "中航高科",
+          "change_pct": 10.0291538239
+        },
+        {
+          "code": "002985",
+          "name": "北摩高科",
+          "change_pct": 10.014673233
+        }
+      ]
+    },
+    {
+      "industry": "元件",
+      "count": 4,
+      "stocks": [
+        {
+          "code": "603738",
+          "name": "泰晶科技",
+          "change_pct": 9.9914970398
+        },
+        {
+          "code": "301176",
+          "name": "逸豪新材",
+          "change_pct": 19.991519928
+        },
+        {
+          "code": "002552",
+          "name": "宝鼎科技",
+          "change_pct": 10.0056209564
+        },
+        {
+          "code": "600601",
+          "name": "方正科技",
+          "change_pct": 9.9829349518
+        }
+      ]
+    },
+    {
+      "industry": "电网设备",
+      "count": 4,
+      "stocks": [
+        {
+          "code": "002927",
+          "name": "泰永长征",
+          "change_pct": 9.9781904221
+        },
+        {
+          "code": "002270",
+          "name": "华明装备",
+          "change_pct": 10.0
+        },
+        {
+          "code": "600067",
+          "name": "冠城新材",
+          "change_pct": 10.1265821457
+        },
+        {
+          "code": "002882",
+          "name": "金龙羽",
+          "change_pct": 10.0150976181
+        }
+      ]
+    },
+    {
+      "industry": "专用设备",
+      "count": 3,
+      "stocks": [
+        {
+          "code": "002611",
+          "name": "东方精工",
+          "change_pct": 9.9882488251
+        },
+        {
+          "code": "001360",
+          "name": "南矿集团",
+          "change_pct": 9.9765253067
+        },
+        {
+          "code": "603036",
+          "name": "如通股份",
+          "change_pct": 9.9697885513
+        }
+      ]
+    },
+    {
+      "industry": "软件开发",
+      "count": 3,
+      "stocks": [
+        {
+          "code": "603990",
+          "name": "麦迪科技",
+          "change_pct": 9.9800395966
+        },
+        {
+          "code": "603528",
+          "name": "多伦科技",
+          "change_pct": 10.0308637619
+        },
+        {
+          "code": "300377",
+          "name": "赢时胜",
+          "change_pct": 20.0
+        }
+      ]
+    }
+  ],
+  "consecutive_limit_leaders": [
+    {
+      "code": "002971",
+      "name": "和远气体",
+      "industry": "化学制品",
+      "yesterday_boards": 3,
+      "change_pct": 10.009478569
+    },
+    {
+      "code": "002409",
+      "name": "雅克科技",
+      "industry": "半导体",
+      "yesterday_boards": 2,
+      "change_pct": -0.8678881526
+    },
+    {
+      "code": "002165",
+      "name": "红 宝 丽",
+      "industry": "化学制品",
+      "yesterday_boards": 2,
+      "change_pct": -1.8679950237
+    },
+    {
+      "code": "001696",
+      "name": "宗申动力",
+      "industry": "通用设备",
+      "yesterday_boards": 1,
+      "change_pct": 10.0192680359
+    },
+    {
+      "code": "000032",
+      "name": "深桑达Ａ",
+      "industry": "专业工程",
+      "yesterday_boards": 1,
+      "change_pct": 10.0
+    },
+    {
+      "code": "002203",
+      "name": "海亮股份",
+      "industry": "工业金属",
+      "yesterday_boards": 1,
+      "change_pct": 9.9953069687
+    },
+    {
+      "code": "000510",
+      "name": "新金路",
+      "industry": "化学原料",
+      "yesterday_boards": 1,
+      "change_pct": 9.9943208694
+    },
+    {
+      "code": "001257",
+      "name": "盛龙股份",
+      "industry": "小金属",
+      "yesterday_boards": 1,
+      "change_pct": 9.9920701981
+    },
+    {
+      "code": "688545",
+      "name": "XD兴福电",
+      "industry": "电子化学",
+      "yesterday_boards": 1,
+      "change_pct": 5.3348684311
+    },
+    {
+      "code": "600141",
+      "name": "兴发集团",
+      "industry": "农化制品",
+      "yesterday_boards": 1,
+      "change_pct": 4.766269207
+    },
+    {
+      "code": "002469",
+      "name": "三维化学",
+      "industry": "化学原料",
+      "yesterday_boards": 1,
+      "change_pct": 4.3290042877
+    },
+    {
+      "code": "002913",
+      "name": "奥士康",
+      "industry": "元件",
+      "yesterday_boards": 1,
+      "change_pct": 1.8723868132
+    },
+    {
+      "code": "603324",
+      "name": "盛剑科技",
+      "industry": "环保设备",
+      "yesterday_boards": 1,
+      "change_pct": 0.9163464308
+    },
+    {
+      "code": "000631",
+      "name": "顺发恒能",
+      "industry": "电力",
+      "yesterday_boards": 1,
+      "change_pct": 0.2994012237
+    },
+    {
+      "code": "603355",
+      "name": "莱克电气",
+      "industry": "小家电",
+      "yesterday_boards": 1,
+      "change_pct": -0.2957486212
+    }
+  ],
+  "news_catalyst": {
+    "ok": true,
+    "news_scan_count": 40,
+    "predicted_sectors": [
+      {
+        "industry": "人工智能",
+        "score": 10.0,
+        "article_count": 9,
+        "title_hits": 2,
+        "top_keyword": "AI",
+        "headlines": [
+          "中央网信办举报中心开设“涉AI应用乱象举报专区”。",
+          "OpenAI被逼入价格战？企业都学聪明了：中国模型“极致性价比”！"
+        ]
+      },
+      {
+        "industry": "证券",
+        "score": 4.5,
+        "article_count": 3,
+        "title_hits": 3,
+        "top_keyword": "券商",
+        "headlines": [
+          "券商龙头多股涨超5%，证券ETF东财午后一度涨逾3%",
+          "证券保险ETF鹏华涨超3%，数据保险站上风口"
+        ]
+      },
+      {
+        "industry": "半导体",
+        "score": 2.5,
+        "article_count": 2,
+        "title_hits": 1,
+        "top_keyword": "芯片",
+        "headlines": [
+          "全国首款基于龙架构的农业专用SoC芯片流片成功",
+          "近日，江苏大学与龙芯中科联手推出全国首款基于龙架构的农业专用SoC芯片—…"
+        ]
+      },
+      {
+        "industry": "商贸代理",
+        "score": 2.0,
+        "article_count": 2,
+        "title_hits": 0,
+        "top_keyword": "国际贸易",
+        "headlines": [
+          "在2026中国汽车重庆论坛开幕式上，中国国际贸易促进委员会汽车行业委员会…",
+          "6月10日至12日，由中国商务部主办，中国对外承包工程商会和澳门招商投资…"
+        ]
+      },
+      {
+        "industry": "航空",
+        "score": 1.5,
+        "article_count": 1,
+        "title_hits": 1,
+        "top_keyword": "航空",
+        "headlines": [
+          "通用航空ETF鹏华涨超3%，SpaceX IPO据称已获两倍超额认购"
+        ]
+      }
+    ],
+    "ahead_of_fund_flow": [
+      "人工智能",
+      "半导体",
+      "商贸代理",
+      "航空"
+    ],
+    "watch_if": "新闻催化→优先观察人工智能/半导体/商贸代理，待9:35资金确认",
+    "llm_predicted": [
+      {
+        "industry": "人工智能",
+        "reason": "AI监管及价格战新闻催化，但资金未确认",
+        "confidence": "medium"
+      },
+      {
+        "industry": "半导体",
+        "reason": "龙架构农业芯片新闻催化，但资金未确认",
+        "confidence": "medium"
+      },
+      {
+        "industry": "商贸代理",
+        "reason": "新闻热度高但资金尚未跟进",
+        "confidence": "medium"
+      }
+    ],
+    "llm_watch": "关注AI、半导体能否获得资金回流。"
+  },
+  "llm_insight": {
+    "ok": true,
+    "enabled": true,
+    "brief": "证券、电池资金大幅流入，AI、半导体等新闻热点资金尚未确认。",
+    "watch": "关注AI、半导体能否获得资金回流。",
+    "predicted_sectors": [
+      {
+        "industry": "人工智能",
+        "reason": "AI监管及价格战新闻催化，但资金未确认",
+        "confidence": "medium"
+      },
+      {
+        "industry": "半导体",
+        "reason": "龙架构农业芯片新闻催化，但资金未确认",
+        "confidence": "medium"
+      },
+      {
+        "industry": "商贸代理",
+        "reason": "新闻热度高但资金尚未跟进",
+        "confidence": "medium"
+      }
+    ],
+    "model": "deepseek-v4-flash",
+    "elapsed_ms": 10544
+  }
+}

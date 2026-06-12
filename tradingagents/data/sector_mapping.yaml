@@ -36,6 +36,7 @@
   source:
     eastmoney_industry:
     - 半导体
+    - 电子化学
     eastmoney_concept:
     - 半导体
     - 国产芯片
@@ -97,6 +98,8 @@
   source:
     eastmoney_industry:
     - 有色金属
+    - 工业金属
+    - 金属新材
     eastmoney_concept:
     - 有色金属
     danginvest_board:
@@ -114,6 +117,7 @@
   source:
     eastmoney_industry:
     - 电力行业
+    - 电力
     eastmoney_concept: []
     danginvest_board:
     - 新型电力
@@ -253,6 +257,8 @@
     eastmoney_concept: []
     danginvest_board:
     - 黄金
+  related_limit_up_industries:
+  - 小金属
   search_keywords:
   - 黄金
   overlap_evidence:
@@ -484,6 +490,7 @@
   source:
     eastmoney_industry:
     - 电子元件
+    - 元件
     eastmoney_concept:
     - 消费电子
     - 电子元件
@@ -502,6 +509,7 @@
   source:
     eastmoney_industry:
     - 小金属
+    - 能源金属
     eastmoney_concept:
     - 小金属
     - 稀土
@@ -549,6 +557,12 @@
   source:
     eastmoney_industry:
     - 航天航空
+    - 军工装备
+    - 航空装备
+    - 军工电子
+    - 航天装备
+    - 地面兵装
+    - 航海装备
     eastmoney_concept:
     - 航天
     - 航空航天
@@ -733,6 +747,7 @@
   source:
     eastmoney_industry:
     - 软件服务
+    - IT服务
     eastmoney_concept:
     - 软件服务
     - 信创
@@ -920,6 +935,7 @@
     eastmoney_industry:
     - 光伏设备
     - 电机
+    - 电网设备
     eastmoney_concept:
     - 特高压
     - 智能电网
@@ -1015,6 +1031,21 @@
   - 太阳能
   - HJT 电池
   - 光伏产业链
+  overlap_evidence: {}
+- canonical: 电池
+  source:
+    eastmoney_industry:
+    - 电池
+    eastmoney_concept:
+    - 锂电池
+    - 固态电池
+    danginvest_board: []
+  related_limit_up_industries:
+  - 能源金属
+  search_keywords:
+  - 电池
+  - 锂电池
+  - 固态电池
   overlap_evidence: {}
 - canonical: 医药
   source:

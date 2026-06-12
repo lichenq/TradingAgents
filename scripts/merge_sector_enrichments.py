@@ -28,6 +28,14 @@ LEGACY_ALIASES = {
     "消费电子": ("eastmoney_concept", "电子元件"),
     "白酒": ("eastmoney_concept", "酿酒行业"),
     "航天": ("eastmoney_concept", "航空"),
+    "军工装备": ("eastmoney_industry", "航空"),
+    "航空装备": ("eastmoney_industry", "航空"),
+    "工业金属": ("eastmoney_industry", "有色金属"),
+    "元件": ("eastmoney_industry", "电子元件"),
+    "电池": ("eastmoney_industry", "电池"),
+    "IT服务": ("eastmoney_industry", "软件服务"),
+    "电网设备": ("eastmoney_industry", "电气设备"),
+    "电力": ("eastmoney_industry", "电力行业"),
 }
 
 # ── Enrichments ─────────────────────────────────────────────────
