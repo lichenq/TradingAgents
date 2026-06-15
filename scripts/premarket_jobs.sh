@@ -29,7 +29,8 @@ export PREMARKET_RUN_TA="${PREMARKET_RUN_TA:-1}"
 export PREMARKET_RUN_DEEP="${PREMARKET_RUN_DEEP:-0}"
 export PREMARKET_LLM="${PREMARKET_LLM:-1}"
 export PREMARKET_LLM_OPEN="${PREMARKET_LLM_OPEN:-0}"
-export PREMARKET_DEEP_CURATE="${PREMARKET_DEEP_CURATE:-0}"
+export PREMARKET_DEEP_CURATE="${PREMARKET_DEEP_CURATE:-1}"
+export TRADINGAGENTS_FORCE_CURATION="${TRADINGAGENTS_FORCE_CURATION:-1}"
 export PREMARKET_SKIP_NON_TRADING_DAY="${PREMARKET_SKIP_NON_TRADING_DAY:-1}"
 export TRADINGAGENTS_RESULTS_DIR="${TRADINGAGENTS_RESULTS_DIR:-$ROOT/results}"
 
@@ -74,7 +75,13 @@ run_audit() {
       log "audit $d failed (continuing)"
     fi
   done
-  log "audit done"
+    log "audit done"
+  log "audit KPI report"
+  if "$PY" "$ROOT/scripts/audit_report.py" --print >>"$JOB_LOG" 2>&1; then
+    log "audit report done"
+  else
+    log "audit report failed (continuing)"
+  fi
 }
 
 run_evening() {
@@ -104,6 +111,7 @@ show_status() {
     com.tradingagents.premarket.auction
     com.tradingagents.premarket.open
     com.tradingagents.premarket.exhaustion
+    com.tradingagents.premarket.verify
   )
   echo "LaunchAgents (gui/$uid):"
   for label in "${plists[@]}"; do
@@ -124,8 +132,21 @@ show_status() {
   echo "  09:15  auction   竞价预警（条件触发）"
   echo "  09:35  open      开盘确认 + 微信"
   echo "  10:30  exhaustion 主题衰竭（条件触发）"
+  echo "  Fri 16:10 verify    推荐/预测闭环健康检查"
   echo ""
+  echo "Manual: ./scripts/verify_recommendation_loop.sh"
   echo "Env: ${ENV_FILE} $([[ -f $ENV_FILE ]] && echo '(loaded)' || echo '(missing — copy from .example)')"
+}
+
+run_verify() {
+  log "start recommendation loop verify"
+  if "$ROOT/scripts/verify_recommendation_loop.sh" >>"$JOB_LOG" 2>&1; then
+    log "verify ok (exit 0)"
+  else
+    ec=$?
+    log "verify finished exit=$ec (1=warn 2=critical)"
+    return "$ec"
+  fi
 }
 
 case "$JOB" in
@@ -134,9 +155,10 @@ case "$JOB" in
   open) run_notify_mode open ;;
   auction) run_notify_mode auction ;;
   exhaustion) run_notify_mode exhaustion ;;
+  verify) run_verify ;;
   status) show_status ;;
   *)
-    echo "usage: $0 {audit|evening|open|auction|exhaustion|status}" >&2
+    echo "usage: $0 {audit|evening|open|auction|exhaustion|verify|status}" >&2
     exit 1
     ;;
 esac

@@ -466,6 +466,19 @@ def main() -> None:
         confirmed = news_catalyst.catalyst_confirmed(prev.get("news_catalyst"), delta)
         if confirmed:
             curr["catalyst_confirmed"] = confirmed
+        try:
+            from tradingagents.dataflows.forecast_accuracy import record_forecast_accuracy
+            from tradingagents.dataflows.rotation_forecast import load_forecast_raw
+
+            raw_fc = load_forecast_raw(RESULTS_DIR)
+            if raw_fc:
+                record_forecast_accuracy(
+                    raw_fc,
+                    curr.get("top_sectors_by_fund_flow") or [],
+                    results_dir=RESULTS_DIR,
+                )
+        except Exception:
+            pass
         json.dump(curr, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         if delta.get("narrative") or delta.get("rank_up") or delta.get("rank_down"):

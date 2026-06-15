@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tradingagents.premarket.verify</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@TRADINGAGENTS_ROOT@/scripts/verify_recommendation_loop.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>@TRADINGAGENTS_ROOT@</string>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>@TRADINGAGENTS_ROOT@/logs/premarket/verify.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>@TRADINGAGENTS_ROOT@/logs/premarket/verify.stderr.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.npm-global/bin</string>
+    <key>HOME</key>
+    <string>@HOME@</string>
+    <key>VERIFY_REQUIRE_LAUNCHD</key>
+    <string>1</string>
+  </dict>
+</dict>
+</plist>

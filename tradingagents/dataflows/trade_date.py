@@ -93,3 +93,14 @@ def _weekday_fallback(calendar_day: date) -> str:
     while cur.weekday() >= 5:
         cur -= timedelta(days=1)
     return cur.strftime("%Y-%m-%d")
+
+
+def cn_trading_sessions_after(rec_date: str, as_of: date) -> int:
+    """Count A-share sessions strictly after rec_date through as_of (inclusive)."""
+    rec_d = datetime.strptime(str(rec_date)[:10], "%Y-%m-%d").date()
+    if as_of < rec_d:
+        return 0
+    days = sorted(_cn_trading_days_between(rec_d, as_of))
+    rec_s = rec_d.strftime("%Y-%m-%d")
+    as_of_s = as_of.strftime("%Y-%m-%d")
+    return len([d for d in days if d > rec_s and d <= as_of_s])

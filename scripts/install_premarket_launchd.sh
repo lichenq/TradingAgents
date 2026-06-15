@@ -18,6 +18,7 @@ labels=(
   com.tradingagents.premarket.auction
   com.tradingagents.premarket.open
   com.tradingagents.premarket.exhaustion
+  com.tradingagents.premarket.verify
 )
 
 render_plist() {
@@ -42,7 +43,7 @@ bootstrap_one() {
 
 install_all() {
   mkdir -p "$ROOT/logs/premarket" "$ROOT/results/premarket_dryrun/jobs"
-  chmod +x "$ROOT/scripts/premarket_jobs.sh"
+  chmod +x "$ROOT/scripts/premarket_jobs.sh" "$ROOT/scripts/verify_recommendation_loop.sh"
 
   if [[ ! -f "$ROOT/scripts/premarket_jobs.env" ]]; then
     cp "$ROOT/scripts/premarket_jobs.env.example" "$ROOT/scripts/premarket_jobs.env"
@@ -59,7 +60,7 @@ install_all() {
   done
 
   echo ""
-  echo "Installed 5 LaunchAgents → $LAUNCH_AGENTS"
+  echo "Installed ${#labels[@]} LaunchAgents → $LAUNCH_AGENTS"
   "$ROOT/scripts/premarket_jobs.sh" status
 }
 

@@ -7,6 +7,7 @@ from unittest.mock import patch
 from tradingagents.dataflows.trade_date import (
     _cn_default_trade_date,
     _us_default_trade_date,
+    cn_trading_sessions_after,
     resolve_default_trade_date,
 )
 
@@ -57,6 +58,21 @@ class TestTradeDate(unittest.TestCase):
             )
             mock_cn.assert_called_once()
             self.assertEqual(out, "2026-05-22")
+
+    def test_cn_trading_sessions_after(self):
+        with patch(
+            "tradingagents.dataflows.trade_date._cn_trading_days_between",
+            return_value={"2026-06-10", "2026-06-11", "2026-06-12", "2026-06-15"},
+        ):
+            # Fri rec -> Mon as_of: sessions 6/11, 6/12, 6/15 = 3
+            self.assertEqual(
+                cn_trading_sessions_after("2026-06-10", date(2026, 6, 15)),
+                3,
+            )
+            self.assertEqual(
+                cn_trading_sessions_after("2026-06-12", date(2026, 6, 15)),
+                1,
+            )
 
 
 if __name__ == "__main__":

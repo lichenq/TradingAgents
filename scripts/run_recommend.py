@@ -700,6 +700,56 @@ def main() -> int:
         except Exception as exc:
             prog.step(f"复盘 audit 摘要跳过: {exc}")
 
+    cautious_sectors: Dict[str, Any] = {}
+    cautious_sectors: Dict[str, Any] = {}
+    try:
+        from tradingagents.dataflows.audit_feedback_gates import (
+            build_cautious_sectors,
+            evaluate_strategy_audit_gate,
+        )
+
+        gate = evaluate_strategy_audit_gate(config["results_dir"], args.strategy)
+        st = gate.get("stats") or {}
+        if st.get("count"):
+            wr = st.get("win_rate")
+            wr_s = f"{wr:.0%}" if wr is not None else "N/A"
+            prog.step(
+                f"P1 策略门禁 {args.strategy} {st.get('horizon')}d: "
+                f"n={st['count']} win_rate={wr_s} → {gate['reason']}"
+            )
+        if not gate["allowed"] and not args.force:
+            logger.error(
+                f"策略被复盘门禁暂停: {gate['reason']}。使用 --force 强制执行。"
+            )
+            return 2
+        cautious_sectors = build_cautious_sectors(config["results_dir"])
+        if cautious_sectors:
+            names = ", ".join(sorted(cautious_sectors.keys())[:5])
+            prog.step(f"P1 板块谨慎名单({len(cautious_sectors)}): {names}")
+    except Exception as exc:
+        prog.step(f"P1 audit 门禁跳过: {exc}")
+
+    from tradingagents.recommend.regime_stage1 import detect_book_regime, regime_stage1_params
+
+    book_regime = detect_book_regime(trade_date)
+    regime_params = regime_stage1_params(book_regime)
+    prog.step(f"市况 regime={book_regime}: {regime_params.note}")
+    if args.strategy in regime_params.blocked_strategies and not args.force:
+        logger.error(
+            f"策略 {args.strategy} 在 {book_regime} 下被禁用。使用 --force 强制执行。"
+        )
+        return 2
+    if args.validate_top > regime_params.validate_top_cap:
+        prog.step(
+            f"validate_top {args.validate_top} → {regime_params.validate_top_cap} (regime)"
+        )
+        args.validate_top = regime_params.validate_top_cap
+    if regime_params.min_volume_multiplier != 1.0:
+        args.min_volume_amount *= regime_params.min_volume_multiplier
+        prog.step(
+            f"min_volume_amount ×{regime_params.min_volume_multiplier:.1f} (regime)"
+        )
+
     # =====================================================================
     # STAGE 1: Fast Quantitative screening
     # =====================================================================
@@ -748,13 +798,16 @@ def main() -> int:
                     "fetch_industry_fund_flow.py",
                     ["--limit", "15", "--json"],
                 )
-                results_dir = Path(os.environ.get("TRADINGAGENTS_RESULTS_DIR", "results"))
+                results_dir = Path(config["results_dir"])
                 forecast_raw = load_forecast_raw(results_dir)
                 top_boards: list[str] = []
                 if ok_flow and isinstance(flow_data, dict):
                     flow_items = flow_data.get("items") or []
                     top_boards, fc_notes = filter_hot_industries_by_forecast(
-                        flow_items, forecast_raw, top_n=5
+                        flow_items,
+                        forecast_raw,
+                        top_n=5,
+                        results_dir=results_dir,
                     )
                     for note in fc_notes:
                         prog.step(note)
@@ -1006,6 +1059,20 @@ def main() -> int:
                 pruned_list.append(item)
                 continue
 
+            if cautious_sectors:
+                from tradingagents.dataflows.audit_feedback_gates import (
+                    evaluate_sector_high_pe_gate,
+                )
+
+                pe_flagged, pe_reason = evaluate_sector_high_pe_gate(
+                    code, trade_date, cautious_sectors, config
+                )
+                if pe_flagged:
+                    prog.step(f"剔除 {name}({code[-6:]}) 复盘门禁: {pe_reason[:60]}...")
+                    item["prune_reason"] = pe_reason
+                    pruned_list.append(item)
+                    continue
+
             valid_shortlist.append(item)
             if len(valid_shortlist) >= args.validate_top:
                 break
@@ -1061,13 +1128,32 @@ def main() -> int:
         else:
             prog.step("无候选股，跳过深度研判")
 
+    try:
+        from tradingagents.graph.storage import save_recommendation_to_sqlite
+
+        for r in validated_results:
+            save_recommendation_to_sqlite(r, args.strategy, trade_date)
+        if validated_results:
+            prog.step(
+                f"Stage2 共 {len(validated_results)} 只已入库 SQLite（含 Hold/Underweight）"
+            )
+    except Exception as e:
+        logger.warning(f"Failed to sync Stage2 results to SQLite: {e}")
+
     # =====================================================================
     # STAGE 3: Read full reports → curate final list → export
     # =====================================================================
-    skip_curation = args.skip_curation or os.environ.get(
-        "TRADINGAGENTS_RECOMMEND_SKIP_CURATION", ""
-    ).strip().lower() in ("1", "true", "yes", "on")
+    from tradingagents.recommend.curation_rules import (
+        build_curation_context,
+        should_skip_curation,
+    )
+    from tradingagents.recommend.portfolio_curator import _legacy_filter
+
+    skip_curation = should_skip_curation(args.skip_curation)
+    curation_ctx = build_curation_context(config, trade_date, args.strategy)
+    shadow_recommendations = _legacy_filter(validated_results)
     curation_meta: Dict[str, Any] = {}
+    recommended_stocks: List[Dict[str, Any]] = []
 
     with prog.stage(
         "Stage3 读报告精选",
@@ -1078,18 +1164,24 @@ def main() -> int:
             config,
             trade_date,
             skip=skip_curation,
+            curation_ctx=curation_ctx,
         )
+        curation_meta["book_regime"] = book_regime
+        curation_meta["shadow_legacy_count"] = len(shadow_recommendations)
         if curation_meta.get("method") == "llm":
             prog.step(
                 f"已阅读完整报告并精选 {len(recommended_stocks)} 只 "
                 f"({curation_meta.get('portfolio_summary', '')[:80]})"
             )
         elif skip_curation:
-            prog.step("已跳过 Stage-3 读报告精选 (--skip-curation)")
+            prog.step("已跳过 LLM 精选 (--skip-curation)，仅硬规则")
         else:
             prog.step(
                 f"精选方式: {curation_meta.get('method', 'legacy')} → {len(recommended_stocks)} 只"
             )
+        rejected = curation_meta.get("hard_rule_rejected") or []
+        if rejected:
+            prog.step(f"硬规则剔除 {len(rejected)} 只")
 
         rec_dir = Path(config["results_dir"]) / "recommendations" / trade_date
         rec_dir.mkdir(parents=True, exist_ok=True)
@@ -1100,12 +1192,23 @@ def main() -> int:
         summary = {
             "trade_date": trade_date,
             "strategy": args.strategy,
+            "book_regime": book_regime,
             "curation": curation_meta,
+            "shadow_recommendations": [
+                {
+                    "code": r["code"],
+                    "name": r["name"],
+                    "rating": r["rating"],
+                    "score": r["score"],
+                }
+                for r in shadow_recommendations
+            ],
             "parameters": {
                 "top_n": args.top_n,
                 "validate_top": args.validate_top,
                 "min_volume_amount": args.min_volume_amount,
                 "skip_curation": skip_curation,
+                "force_curation": not skip_curation,
             },
             "all_screened_count": len(shortlist),
             "pruned": [

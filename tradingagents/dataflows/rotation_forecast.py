@@ -123,11 +123,22 @@ def filter_hot_industries_by_forecast(
     *,
     top_n: int = 5,
     min_inflow_override_yi: float = MIN_INFLOW_OVERRIDE_YI,
+    results_dir: Path | None = None,
 ) -> tuple[list[str], list[str]]:
     """Pick top industries by fund flow after forecast danger filter / T0 override."""
     sectors = sector_entries(forecast)
     kept: list[dict[str, Any]] = []
     notes: list[str] = []
+    demoted_cache: dict[str, bool] = {}
+
+    try:
+        from tradingagents.dataflows.forecast_accuracy import category_demoted
+
+        base_dir = results_dir or _results_dir()
+    except Exception:
+        category_demoted = None  # type: ignore[assignment,misc]
+        base_dir = None
+
     for item in items:
         industry = str(item.get("industry") or "").strip()
         if not industry:
@@ -135,10 +146,19 @@ def filter_hot_industries_by_forecast(
         inflow = float(item.get("main_net_inflow_yi") or 0)
         entry = lookup_forecast_entry(industry, sectors)
         cat = (entry or {}).get("category") or "NORMAL"
-        if cat in DANGER_CATEGORIES and inflow < min_inflow_override_yi:
+        demoted = False
+        if category_demoted is not None and base_dir is not None:
+            if cat not in demoted_cache:
+                demoted_cache[cat] = category_demoted(cat, base_dir)
+            demoted = demoted_cache[cat]
+        override_threshold = min_inflow_override_yi
+        if demoted and cat in DANGER_CATEGORIES:
+            override_threshold = min_inflow_override_yi * 2.0
+            notes.append(f"低命中率降级 {cat} → T0阈值升至 {override_threshold:.1f}亿")
+        if cat in DANGER_CATEGORIES and inflow < override_threshold:
             notes.append(f"避雷跳过 {industry}（{cat}，实时流入 {inflow:.2f}亿）")
             continue
-        if cat in DANGER_CATEGORIES and inflow >= min_inflow_override_yi:
+        if cat in DANGER_CATEGORIES and inflow >= override_threshold:
             notes.append(f"T0 覆盖保留 {industry}（{cat}，实时流入 {inflow:.2f}亿）")
         kept.append(item)
     selected = [str(x["industry"]) for x in kept[:top_n] if x.get("industry")]

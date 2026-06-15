@@ -16,6 +16,11 @@ from tradingagents.dataflows.report_paths import report_bundle_dir
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.storage import query_report_flexible
 from tradingagents.llm_clients import create_llm_client
+from tradingagents.recommend.curation_rules import (
+    CurationContext,
+    apply_hard_rules,
+    finalize_actionable_list,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -202,18 +207,42 @@ def curate_final_recommendations(
     trade_date: str,
     *,
     skip: bool = False,
+    curation_ctx: Optional[CurationContext] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Read complete reports via LLM and return final recommended list.
 
     Returns (recommended_stocks, curation_meta).
     """
     meta: Dict[str, Any] = {"skipped": skip, "method": "legacy"}
-    if skip or not validated_results:
-        return _legacy_filter(validated_results), meta
+    ctx = curation_ctx
+    if ctx is None:
+        from tradingagents.recommend.curation_rules import build_curation_context
 
-    candidates = [r for r in validated_results if r.get("rating") != "FAILED"]
+        ctx = build_curation_context(config, trade_date, "")
+
+    hard_passed, hard_rejected = apply_hard_rules(validated_results, ctx)
+    meta["hard_rule_rejected"] = [
+        {
+            "code": r.get("code"),
+            "name": r.get("name"),
+            "reason": r.get("hard_rule_reason"),
+        }
+        for r in hard_rejected
+    ]
+    meta["hard_rule_pass_count"] = len(hard_passed)
+
+    if skip or not validated_results:
+        meta["method"] = "hard_rules_only" if not skip else "legacy"
+        if skip:
+            return _legacy_filter(validated_results), meta
+        selected = finalize_actionable_list(hard_passed, ctx)
+        meta["selected_count"] = len(selected)
+        return selected, meta
+
+    candidates = [r for r in hard_passed if r.get("rating") != "FAILED"]
     if not candidates:
-        meta["reason"] = "all_failed"
+        meta["reason"] = "all_failed_or_hard_rejected"
+        meta["method"] = "hard_rules_empty"
         return [], meta
 
     report_blocks: List[str] = []
@@ -250,8 +279,10 @@ def curate_final_recommendations(
 
     if not report_blocks:
         meta["reason"] = "no_readable_reports"
-        meta["method"] = "legacy_no_reports"
-        return _legacy_filter(validated_results), meta
+        meta["method"] = "hard_rules_no_reports"
+        selected = finalize_actionable_list(hard_passed, ctx)
+        meta["selected_count"] = len(selected)
+        return selected, meta
 
     provider = config.get("llm_provider") or DEFAULT_CONFIG["llm_provider"]
     model = config.get("deep_think_llm") or DEFAULT_CONFIG["deep_think_llm"]
@@ -301,6 +332,7 @@ Respond with structured picks for every candidate and a brief portfolio_summary.
             meta["portfolio_summary"] = free_text[:500]
         meta["method"] = "llm"
         selected = _apply_curation_picks(validated_results, picks)
+        selected = finalize_actionable_list(selected, ctx)
         if not selected:
             # LLM read reports and chose zero names — do not override with rating sort.
             meta["selected_count"] = 0
@@ -311,5 +343,7 @@ Respond with structured picks for every candidate and a brief portfolio_summary.
     except Exception as exc:
         logger.error("Stage-3 LLM curation failed (%s); falling back to rating sort", exc)
         meta["error"] = str(exc)
-        meta["method"] = "legacy_after_error"
-        return _legacy_filter(validated_results), meta
+        meta["method"] = "hard_rules_after_error"
+        selected = finalize_actionable_list(hard_passed, ctx)
+        meta["selected_count"] = len(selected)
+        return selected, meta

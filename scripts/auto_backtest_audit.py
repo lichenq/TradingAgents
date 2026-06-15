@@ -29,6 +29,8 @@ if str(project_root) not in sys.path:
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.dataflows.a_share_runner import run_script
+from tradingagents.dataflows.audit_report import write_audit_report
+from tradingagents.dataflows.trade_date import cn_trading_sessions_after
 from tradingagents.graph.storage import get_db_path, init_db, query_report, save_backtest_audit
 from tradingagents.llm_clients import create_llm_client
 
@@ -54,23 +56,38 @@ def fetch_latest_price(code6: str) -> Optional[float]:
     return None
 
 
-def get_recommendations_to_audit(conn: sqlite3.Connection, audit_days: int) -> List[Dict[str, Any]]:
-    """Query recommendations made exactly `audit_days` ago that have not been audited in backtest_audits yet."""
-    target_date = (datetime.date.today() - datetime.timedelta(days=audit_days)).strftime("%Y-%m-%d")
-    logger.info(f"Searching for recommendations made on: {target_date} (backtest horizon: {audit_days} days)")
-    
-    cursor = conn.cursor()
+def get_recommendations_to_audit(
+    conn: sqlite3.Connection,
+    audit_days: int,
+    as_of: Optional[datetime.date] = None,
+) -> List[Dict[str, Any]]:
+    """Query recommendations ready for audit at the given trading-session horizon."""
+    as_of = as_of or datetime.date.today()
+    logger.info(
+        f"Searching for recommendations with >={audit_days} trading sessions elapsed "
+        f"(as_of={as_of.isoformat()})"
+    )
+
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
-    # Query recommendations that do not yet have an entry in backtest_audits for the same days_elapsed
+
     cursor.execute("""
         SELECT r.* FROM recommendations r
         LEFT JOIN backtest_audits b ON r.code = b.ticker AND r.trade_date = b.recommendation_date AND b.days_elapsed = ?
-        WHERE r.trade_date = ? AND b.id IS NULL
-    """, (audit_days, target_date))
-    
-    return [dict(row) for row in cursor.fetchall()]
+        WHERE b.id IS NULL
+    """, (audit_days,))
+
+    rows = [dict(row) for row in cursor.fetchall()]
+    ready = [
+        r for r in rows
+        if cn_trading_sessions_after(r["trade_date"], as_of) >= audit_days
+    ]
+    if rows and not ready:
+        logger.info(
+            f"{len(rows)} unaudited recommendation(s) found but none reached "
+            f"{audit_days} trading sessions yet."
+        )
+    return ready
 
 
 def run_ai_reflection_agent(
@@ -143,9 +160,24 @@ def main() -> int:
         default="",
         help="Custom results directory containing the SQLite database"
     )
+    parser.add_argument(
+        "--as-of",
+        default="",
+        help="Audit as-of date YYYY-MM-DD (default: today)"
+    )
+    parser.add_argument(
+        "--write-report",
+        action="store_true",
+        help="Write audit KPI report JSON after audit cycle"
+    )
     args = parser.parse_args()
 
     results_dir = Path(args.results_dir) if args.results_dir else Path(DEFAULT_CONFIG["results_dir"])
+    as_of = (
+        datetime.datetime.strptime(args.as_of[:10], "%Y-%m-%d").date()
+        if args.as_of.strip()
+        else datetime.date.today()
+    )
     db_path = get_db_path(results_dir)
     init_db(results_dir)
     
@@ -153,9 +185,15 @@ def main() -> int:
     conn = sqlite3.connect(str(db_path))
     
     try:
-        recs = get_recommendations_to_audit(conn, args.days_ago)
+        recs = get_recommendations_to_audit(conn, args.days_ago, as_of=as_of)
         if not recs:
-            logger.info(f"No unaudited recommendations found from {args.days_ago} days ago. Everything is up to date!")
+            logger.info(
+                f"No unaudited recommendations ready for {args.days_ago}-session horizon. "
+                "Everything is up to date!"
+            )
+            if args.write_report:
+                path = write_audit_report(results_dir, as_of=as_of)
+                logger.info(f"Audit KPI report written: {path}")
             return 0
             
         logger.info(f"Found {len(recs)} recommendation(s) to audit.")
@@ -201,7 +239,7 @@ def main() -> int:
             )
             
             # 5. Save back to SQLite backtest_audits
-            audit_date = datetime.date.today().strftime("%Y-%m-%d")
+            audit_date = as_of.strftime("%Y-%m-%d")
             save_backtest_audit(
                 results_dir=results_dir,
                 ticker=code,
@@ -237,7 +275,14 @@ def main() -> int:
         return 1
     finally:
         conn.close()
-        
+
+    if args.write_report:
+        try:
+            path = write_audit_report(results_dir, as_of=as_of)
+            logger.info(f"Audit KPI report written: {path}")
+        except Exception as e:
+            logger.error(f"Failed to write audit KPI report: {e}")
+
     logger.info("Automated Backtest and AI Reflection Audit cycle successfully completed!")
     return 0
 
