@@ -222,3 +222,6 @@ __marimo__/
 # Premarket scheduled jobs (local)
 scripts/premarket_jobs.env
 logs/premarket/
+
+# Analysis outputs (local runtime artifacts)
+results/
