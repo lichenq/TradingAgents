@@ -361,7 +361,15 @@ def generate_rotation_report(results: List[dict]) -> str:
 def _build_forecast_json(results: List[dict]) -> dict:
     """Build sector rotation forecast dict from analysis results."""
     update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    forecast = {}
+    trade_date = results[0]["trade_date"] if results else datetime.now().strftime("%Y-%m-%d")
+    if trade_date and len(trade_date) > 10:
+        trade_date = trade_date[:10]
+    forecast: dict = {
+        "_meta": {
+            "trade_date": trade_date,
+            "as_of": update_time,
+        },
+    }
     for r in results:
         forecast[r["sector_name"]] = {
             "category": r["category"],

@@ -679,6 +679,26 @@ def main() -> int:
         init_db(config["results_dir"])
         trade_date = args.date.strip() or resolve_default_trade_date("600519", config)
         prog.step(f"trade_date={trade_date}")
+        try:
+            from tradingagents.dataflows.backtest_audit_context import (
+                audit_win_rate_summary,
+                format_backtest_audit_context,
+            )
+
+            stats = audit_win_rate_summary(config["results_dir"], limit=30)
+            if stats["count"]:
+                wr = stats["win_rate"]
+                ar = stats["avg_return"]
+                wr_s = f"{wr:.0%}" if wr is not None else "N/A"
+                ar_s = f"{ar:+.1%}" if ar is not None else "N/A"
+                prog.step(
+                    f"复盘 audit 近{stats['count']}条: 胜率={wr_s} 均收益={ar_s}"
+                )
+            preview = format_backtest_audit_context(config["results_dir"], limit=2)
+            if preview:
+                prog.step("复盘 lessons 将注入 Stage2 组合经理 prompt")
+        except Exception as exc:
+            prog.step(f"复盘 audit 摘要跳过: {exc}")
 
     # =====================================================================
     # STAGE 1: Fast Quantitative screening
@@ -718,33 +738,57 @@ def main() -> int:
                 prog.step(f"板块名称智能映射: '{args.board}' -> '{resolved_board}'")
 
             if resolved_board.lower() == "auto":
-                prog.step("正在获取今日资金流入前五的热点行业板块...")
-                ok_b, raw_b, boards_summary = run_a_share_script(
-                    "fetch_realtime.py",
-                    ["--boards-summary", "--boards-limit", "5", "--boards-sort", "change_pct_desc", "--json"]
+                from tradingagents.dataflows.rotation_forecast import (
+                    filter_hot_industries_by_forecast,
+                    load_forecast_raw,
                 )
-                if ok_b and isinstance(boards_summary, dict):
-                    top_boards = [
-                        b.get("groupLabel") or b.get("name")
-                        for b in boards_summary.get("data", [])
-                        if b.get("groupLabel") or b.get("name")
-                    ]
-                    prog.step(f"今日热点板块前五名: {top_boards}")
-                    for board_name in top_boards:
-                        ok_c, raw_c, board_detail = run_a_share_script(
+
+                prog.step("正在按主力净流入获取热点行业，并叠加板块轮动预测过滤...")
+                ok_flow, raw_flow, flow_data = run_a_share_script(
+                    "fetch_industry_fund_flow.py",
+                    ["--limit", "15", "--json"],
+                )
+                results_dir = Path(os.environ.get("TRADINGAGENTS_RESULTS_DIR", "results"))
+                forecast_raw = load_forecast_raw(results_dir)
+                top_boards: list[str] = []
+                if ok_flow and isinstance(flow_data, dict):
+                    flow_items = flow_data.get("items") or []
+                    top_boards, fc_notes = filter_hot_industries_by_forecast(
+                        flow_items, forecast_raw, top_n=5
+                    )
+                    for note in fc_notes:
+                        prog.step(note)
+                if not top_boards:
+                    logger.warning(f"自动热点板块获取失败: {raw_flow}")
+                else:
+                    prog.step(f"主力净流入热点前五（预测过滤后）: {top_boards}")
+
+                for industry in top_boards:
+                    ind_resolved = resolve_sector(industry)
+                    mapped = get_danginvest_boards(ind_resolved)
+                    board_key = mapped[0] if mapped else ind_resolved
+                    codes: set = set()
+                    for mode in ("industry", "concept"):
+                        ok_c, _, board_detail = run_a_share_script(
                             "fetch_realtime.py",
-                            ["--boards-detail", "--boards-group-key", board_name, "--boards-items-limit", "100", "--json"]
+                            [
+                                "--boards-detail",
+                                "--boards-mode", mode,
+                                "--boards-group-key", board_key,
+                                "--boards-items-limit", "300",
+                                "--json",
+                            ],
                         )
                         if ok_c and isinstance(board_detail, dict):
-                            items = (board_detail.get("data") or {}).get("items") or []
-                            for item in items:
-                                code = item.get("code") or ""
-                                code6 = "".join(ch for ch in code if ch.isdigit())[-6:]
+                            for item in (board_detail.get("data") or {}).get("items") or []:
+                                code6 = "".join(ch for ch in (item.get("code") or "") if ch.isdigit())[-6:]
                                 if len(code6) == 6:
-                                    board_codes.add(code6)
-                    prog.step(f"自动热点板块对齐完成，共筛选出 {len(board_codes)} 只个股")
-                else:
-                    logger.warning(f"自动获取热点行业失败: {raw_b}")
+                                    codes.add(code6)
+                        if codes:
+                            break
+                    board_codes.update(codes)
+                    prog.step(f"板块 '{industry}' -> '{board_key}' 成分股 {len(codes)} 只")
+                prog.step(f"自动热点板块对齐完成，共筛选出 {len(board_codes)} 只个股")
             else:
                 def _fetch_board(mode: str) -> set:
                     """Fetch board detail with given mode, return set of 6-digit codes."""

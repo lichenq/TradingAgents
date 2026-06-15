@@ -2,13 +2,15 @@
 """Load sector_rotation_forecast and attach to premarket sector summary."""
 from __future__ import annotations
 
-import json
 import os
-from datetime import date
 from pathlib import Path
 from typing import Any
 
-from tradingagents.dataflows.sector_mapping import get_match_names
+from tradingagents.dataflows.rotation_forecast import (
+    lookup_forecast_entry,
+    load_forecast_raw,
+    sector_entries,
+)
 
 CATEGORY_LABEL = {
     "ADV_ACCUMULATION": "逆向吸筹",
@@ -27,53 +29,12 @@ def _results_dir() -> Path:
     return Path(raw)
 
 
-def load_forecast_raw(results_dir: Path | None = None) -> dict[str, Any]:
-    base = results_dir or _results_dir()
-    json_path = base / "recommendations" / "sector_rotation_forecast.json"
-    if json_path.is_file():
-        try:
-            data = json.loads(json_path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return data
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    try:
-        from tradingagents.graph.storage import query_sector_rotation
-
-        row = query_sector_rotation(base, date.today().isoformat())
-        if row:
-            raw = row.get("forecast_json")
-            if isinstance(raw, str) and raw.strip():
-                parsed = json.loads(raw)
-                if isinstance(parsed, dict):
-                    return parsed
-            if isinstance(raw, dict):
-                return raw
-    except Exception:
-        pass
-    return {}
-
-
-def lookup_forecast_entry(industry: str, forecast: dict[str, Any]) -> dict[str, Any] | None:
-    if not industry or not forecast:
-        return None
-    if industry in forecast:
-        return forecast[industry]
-    aliases = set(get_match_names(industry))
-    for key, val in forecast.items():
-        if key in aliases or key == industry:
-            return val
-        if key in get_match_names(industry):
-            return val
-    return None
-
-
 def attach_forecast(sectors: list[dict[str, Any]], forecast: dict[str, Any]) -> dict[str, Any]:
     highlights: list[dict[str, Any]] = []
+    sectors_fc = sector_entries(forecast)
     for s in sectors:
         ind = s.get("industry") or ""
-        entry = lookup_forecast_entry(ind, forecast)
+        entry = lookup_forecast_entry(ind, sectors_fc)
         if not entry:
             continue
         cat = entry.get("category") or "NORMAL"
@@ -87,7 +48,7 @@ def attach_forecast(sectors: list[dict[str, Any]], forecast: dict[str, Any]) -> 
         s["forecast"] = enriched
         highlights.append({"industry": ind, **enriched})
 
-    source = "sector_rotation_forecast.json" if forecast else ""
+    source = "sector_rotation_forecast.json" if sectors_fc else ""
     return {
         "ok": bool(highlights),
         "highlights": highlights[:5],

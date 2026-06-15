@@ -89,53 +89,28 @@ def detect_market_regime(ticker: str, trade_date: str) -> str:
 
     sector_name = resolve_sector(raw_sector)
 
-    # 动态获取行业轮动预测
-    forecast_data = {}
-    
-    # 1. 优先从 SQLite 数据库获取 (主数据源)
-    try:
-        from tradingagents.graph.storage import query_sector_rotation, parse_json_safe
-        results_dir = config.get("results_dir") or "results"
-        db_res = query_sector_rotation(results_dir, trade_date)
-        if db_res and db_res.get("forecast_json"):
-            forecast_data = parse_json_safe(db_res["forecast_json"]) or {}
-            logger.info(f"Regime Detector: Successfully retrieved sector rotation forecast from database for trade_date {trade_date}")
-    except Exception as e:
-        logger.warning(f"Regime Detector: Failed to query sector rotation from SQLite: {e}")
+    results_dir = config.get("results_dir") or "results"
+    from pathlib import Path
+    from tradingagents.dataflows.rotation_forecast import load_forecast_raw, lookup_forecast_entry
 
-    # 2. 备用：从本地文件加载
-    if not forecast_data:
-        forecast_path = "results/recommendations/sector_rotation_forecast.json"
-        if os.path.exists(forecast_path):
-            try:
-                from tradingagents.graph.storage import parse_json_safe
-                with open(forecast_path, "r", encoding="utf-8") as f:
-                    forecast_data = parse_json_safe(f.read()) or {}
-                if forecast_data:
-                    logger.info(f"Regime Detector: Fallback: Loaded sector rotation forecast from local file {forecast_path}")
-            except Exception:
-                pass
-
-    if forecast_data:
+    forecast_data = load_forecast_raw(Path(results_dir))
+    target_fc = lookup_forecast_entry(sector_name, forecast_data)
+    if target_fc:
         try:
-            # 在预测结果中查找对应的板块
-            target_fc = None
-            for key, val in forecast_data.items():
-                if key == sector_name or key in sector_name or sector_name in key:
-                    target_fc = val
-                    break
-            
-            if target_fc:
-                category = target_fc.get("category")
-                # 如果被定性为大流出或诱多，强制返回冷门防御环境，保护资金
-                if category in ("SYSTEMIC_LIQUIDATION", "PANIC_EXIT", "FOMO_DISTRIBUTION"):
-                    logger.info(f"Regime Detector: {ticker} ({sector_name}) overridden to DEFENSIVE_REGIME via Serenity Sector Rotation Forecast (Category: {category})")
-                    return "DEFENSIVE_REGIME"
-                # 如果属于主力砸盘吸筹或强趋势流入，激活高热度环境以容忍合理溢价
-                elif category in ("ADV_ACCUMULATION", "MOM_INFLOW"):
-                    logger.info(f"Regime Detector: {ticker} ({sector_name}) overridden to HIGH_HEAT_REGIME via Serenity Sector Rotation Forecast (Category: {category})")
-                    return "HIGH_HEAT_REGIME"
-        except Exception as e:
+            category = target_fc.get("category")
+            if category in ("SYSTEMIC_LIQUIDATION", "PANIC_EXIT", "FOMO_DISTRIBUTION"):
+                logger.info(
+                    f"Regime Detector: {ticker} ({sector_name}) overridden to DEFENSIVE_REGIME "
+                    f"via Serenity Sector Rotation Forecast (Category: {category})"
+                )
+                return "DEFENSIVE_REGIME"
+            if category in ("ADV_ACCUMULATION", "MOM_INFLOW"):
+                logger.info(
+                    f"Regime Detector: {ticker} ({sector_name}) overridden to HIGH_HEAT_REGIME "
+                    f"via Serenity Sector Rotation Forecast (Category: {category})"
+                )
+                return "HIGH_HEAT_REGIME"
+        except Exception:
             pass
 
     boards = fetch_boards_summary_raw()

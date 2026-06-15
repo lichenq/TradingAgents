@@ -415,8 +415,20 @@ class TradingAgentsGraph:
                 parts.append(f"{shares} 股")
             progress_extra.append(f"持仓注入: {', '.join(parts)}")
 
-        # Initialize state — inject memory log context for PM.
+        # Initialize state — inject memory log + post-audit lessons for PM.
         past_context = self.memory_log.get_past_context(company_name)
+        try:
+            from tradingagents.dataflows.backtest_audit_context import format_backtest_audit_context
+
+            audit_ctx = format_backtest_audit_context(
+                self.config.get("results_dir") or "results",
+                limit=8,
+                ticker=company_name,
+            )
+            if audit_ctx:
+                past_context = f"{past_context}\n\n{audit_ctx}".strip() if past_context else audit_ctx
+        except Exception as exc:
+            logger.warning("Backtest audit context injection skipped: %s", exc)
         parallel_analysts = (
             int(self.config.get("analyst_concurrency_limit", 1)) > 1
         )

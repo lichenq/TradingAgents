@@ -194,7 +194,17 @@ fi
 # ⑨ 开盘确认：对比前一快照（若存在）
 OPEN_SECTORS="${OUT_DIR}/${RUN_ID}_open_sectors.json"
 PREV_SECTORS=""
+PREMARKET_OPEN_FORECAST="${PREMARKET_OPEN_FORECAST:-1}"
 if should_run 9; then
+  if [[ "$PREMARKET_OPEN_FORECAST" == "1" ]]; then
+    log "▶ Node 9-pre: sector_rotation_forecast (open refresh)"
+    t0_fc=$SECONDS
+    if "$PY" "$ROOT/scripts/sector_rotation_forecast.py" >>"$LOG" 2>&1; then
+      log "✓ Node 9-pre forecast done ($((SECONDS - t0_fc))s)"
+    else
+      log "✗ Node 9-pre forecast failed (continuing)"
+    fi
+  fi
   log "▶ Node 9: open-confirm sector snapshot"
   t0=$SECONDS
   PREV_SECTORS="$COMPARE_BASE"

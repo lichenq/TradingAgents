@@ -77,7 +77,10 @@ case "$MODE" in
     [[ -n "$SECTORS" ]] || { echo "no sectors json; run premarket_dryrun.sh --node 3 first" >&2; exit 1; }
     ;;
   evening)
-    "$ROOT/scripts/premarket_dryrun.sh" --node 3 >/dev/null
+    PREMARKET_RUN_FORECAST="${PREMARKET_RUN_FORECAST:-1}"
+    PREMARKET_RUN_TA="${PREMARKET_RUN_TA:-1}"
+    export PREMARKET_RUN_FORECAST PREMARKET_RUN_TA
+    "$ROOT/scripts/premarket_dryrun.sh" --node evening >/dev/null
     SECTORS=$(latest_evening_sectors)
     ;;
   open)

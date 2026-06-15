@@ -17,6 +17,7 @@ from tradingagents.dataflows.sector_mapping import (  # noqa: E402
     get_danginvest_boards,
     get_eastmoney_concepts,
     get_eastmoney_industries,
+    get_match_names,
     resolve,
 )
 
@@ -40,6 +41,8 @@ def board_candidates(industry: str) -> tuple[str, list[str]]:
         add(n)
     for n in get_eastmoney_concepts(canonical):
         add(n)
+    for n in get_match_names(canonical):
+        add(n)
     for n in get_danginvest_boards(canonical):
         add(n)
     add(canonical)
@@ -49,6 +52,21 @@ def board_candidates(industry: str) -> tuple[str, list[str]]:
 def _boards_from_summary(data: dict, limit: int) -> list[str]:
     sectors = data.get("top_sectors_by_fund_flow") or []
     return [s.get("industry", "") for s in sectors[:limit] if s.get("industry")]
+
+
+def _parse_recommend_stdout(stdout: str) -> dict:
+    lines = [ln for ln in stdout.splitlines() if ln.strip()]
+    for i in range(len(lines) - 1, -1, -1):
+        chunk = "\n".join(lines[i:]).strip()
+        if not chunk.startswith("{"):
+            continue
+        try:
+            obj = json.loads(chunk)
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            continue
+    raise json.JSONDecodeError("no json object", stdout or "", 0)
 
 
 def _run_board_once(
@@ -78,12 +96,19 @@ def _run_board_once(
     if proc.returncode != 0:
         return {"ok": False, "board": board, "error": (proc.stderr or proc.stdout)[-300:]}
     try:
-        lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-        payload = json.loads(lines[-1])
-    except (json.JSONDecodeError, IndexError):
+        payload = _parse_recommend_stdout(proc.stdout)
+    except json.JSONDecodeError:
         return {"ok": False, "board": board, "error": "no json in recommend output"}
     recs = payload.get("recommendations") or payload.get("validated") or []
-    return {"ok": True, "board": board, "count": len(recs), "recommendations": recs[:10]}
+    screened = payload.get("all_screened_count")
+    ok = proc.returncode == 0 and (recs or screened is not None)
+    return {
+        "ok": ok,
+        "board": board,
+        "count": len(recs),
+        "all_screened_count": screened,
+        "recommendations": recs[:10],
+    }
 
 
 def _run_board(

@@ -218,3 +218,7 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# Premarket scheduled jobs (local)
+scripts/premarket_jobs.env
+logs/premarket/

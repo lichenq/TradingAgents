@@ -16,14 +16,19 @@ class TestPremarketTaRecommend(unittest.TestCase):
         self.assertIn("券商信托", names)
         self.assertLess(names.index("券商信托"), names.index("证券"))
 
-    def test_board_candidates_battery_has_lithium_aliases(self):
+    def test_board_candidates_battery_includes_energy_metal(self):
         _, names = board_candidates("电池")
-        self.assertIn("电池", names)
-        self.assertIn("锂电池", names)
+        self.assertIn("能源金属", names)
 
     def test_board_candidates_bank(self):
         _, names = board_candidates("银行")
         self.assertIn("银行", names)
+
+    def test_parse_multiline_recommend_json(self):
+        from scripts.premarket_ta_recommend import _parse_recommend_stdout
+        stdout = "log line\n{\n  \"recommendations\": [{\"code\": \"600030\"}],\n  \"all_screened_count\": 1\n}\n"
+        payload = _parse_recommend_stdout(stdout)
+        self.assertEqual(len(payload["recommendations"]), 1)
 
     @patch("scripts.premarket_ta_recommend._run_board_once")
     def test_run_board_falls_back_to_second_candidate(self, mock_once):

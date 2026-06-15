@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -13,12 +12,11 @@ TITLE_EMOJI = {"evening": "🌙", "open": "🔔", "test": "🧪"}
 SECTION_EMOJI = {
     "情绪": "🔥",
     "轮动": "🔄",
-    "AI要点": "💬",
+    "明日动作": "🎯",
     "新闻前瞻": "📰",
-    "资金主线 TOP3": "💰",
+    "资金主线": "💰",
     "连板": "🚀",
     "信号": "⚡",
-    "深度精选": "🎯",
 }
 
 
@@ -68,31 +66,128 @@ def _bullet(line: str) -> str:
     return f"  · {line}"
 
 
-def format_mainline_sectors(sectors: list[dict[str, Any]], *, limit: int = 3) -> list[str]:
-    lines: list[str] = []
-    for s in sectors[:limit]:
-        lines.append(_sector_head(s))
+def _sector_has_signal(s: dict[str, Any]) -> bool:
+    if s.get("limit_up_leaders"):
+        return True
+    if s.get("board_picks"):
+        return True
+    if s.get("ta_pullback"):
+        return True
+    return False
 
-        leaders = s.get("limit_up_leaders") or []
-        if leaders:
-            names = "、".join(_fmt_stock(x.get("name", "")) for x in leaders[:2])
-            lines.append(_bullet(f"🔴 涨停 {names}"))
 
-        picks = s.get("board_picks") or []
-        if picks:
-            names = "、".join(
-                _fmt_stock(x.get("name", ""), x.get("change_pct"), x.get("deep_rating"))
-                for x in picks[:2]
-            )
-            lines.append(_bullet(f"📈 强股 {names}"))
+def _sector_is_focus(s: dict[str, Any]) -> bool:
+    if s.get("limit_up_leaders"):
+        return True
+    picks = s.get("board_picks") or []
+    return any(float(p.get("change_pct") or 0) >= 5 for p in picks)
 
-        ta = s.get("ta_pullback") or []
-        if ta:
-            names = "、".join(
-                _fmt_stock(x.get("name", ""), None, x.get("deep_rating")) for x in ta[:2]
-            )
-            lines.append(_bullet(f"↩️ 回踩 {names}"))
+
+def _format_sector_block(s: dict[str, Any]) -> list[str]:
+    lines = [_sector_head(s)]
+    leaders = s.get("limit_up_leaders") or []
+    if leaders:
+        names = "、".join(_fmt_stock(x.get("name", "")) for x in leaders[:2])
+        lines.append(_bullet(f"🔴 涨停 {names}"))
+
+    picks = s.get("board_picks") or []
+    if picks:
+        names = "、".join(
+            _fmt_stock(x.get("name", ""), x.get("change_pct"), x.get("deep_rating"))
+            for x in picks[:2]
+        )
+        lines.append(_bullet(f"📈 强股 {names}"))
+
+    ta = s.get("ta_pullback") or []
+    if ta:
+        names = "、".join(
+            _fmt_stock(x.get("name", ""), None, x.get("deep_rating")) for x in ta[:2]
+        )
+        lines.append(_bullet(f"↩️ 回踩 {names}"))
     return lines
+
+
+def format_rotation_mainline(
+    sectors: list[dict[str, Any]], *, primary_limit: int = 3
+) -> list[str]:
+    if not sectors:
+        return []
+
+    shown: list[dict[str, Any]] = []
+    shown_inds: set[str] = set()
+    for s in sectors:
+        if not _sector_has_signal(s):
+            continue
+        ind = s.get("industry") or ""
+        if ind in shown_inds:
+            continue
+        shown.append(s)
+        shown_inds.add(ind)
+        if len(shown) >= primary_limit:
+            break
+
+    lines: list[str] = []
+    for s in shown:
+        lines.extend(_format_sector_block(s))
+
+    for s in sectors[3:5]:
+        ind = s.get("industry") or ""
+        if ind in shown_inds:
+            continue
+        if not s.get("limit_up_leaders"):
+            continue
+        lines.extend(_format_sector_block(s))
+        shown_inds.add(ind)
+
+    empty_top = [
+        s.get("industry")
+        for s in sectors[:primary_limit]
+        if s.get("industry") and not _sector_has_signal(s)
+    ]
+    if empty_top:
+        lines.append(_bullet(f"⏸️ 仅搭台（无票）: {'、'.join(empty_top)}"))
+    return lines
+
+
+def _tomorrow_action_line(data: dict[str, Any]) -> str:
+    sectors = data.get("top_sectors_by_fund_flow") or []
+    cat = data.get("news_catalyst") or {}
+    insight = data.get("llm_insight") or {}
+
+    focus: list[str] = []
+    for s in sectors:
+        ind = s.get("industry") or ""
+        if not ind or not _sector_is_focus(s):
+            continue
+        focus.append(ind)
+        if len(focus) >= 2:
+            break
+
+    top3_inds = {s.get("industry") for s in sectors[:3]}
+    watch: list[str] = []
+    for ind in cat.get("ahead_of_fund_flow") or []:
+        if ind and ind not in top3_inds and ind not in watch:
+            watch.append(ind)
+    if not watch:
+        for p in insight.get("predicted_sectors") or []:
+            ind = p.get("industry") or ""
+            if ind and ind not in top3_inds and ind not in watch:
+                watch.append(ind)
+
+    scaffold = [
+        s.get("industry")
+        for s in sectors[:3]
+        if s.get("industry") and not _sector_has_signal(s)
+    ]
+
+    parts: list[str] = []
+    if focus:
+        parts.append(f"主盯 {' / '.join(focus)}")
+    if watch:
+        parts.append(f"观察 {' / '.join(watch[:3])}")
+    if scaffold:
+        parts.append(f"搭台 {' / '.join(scaffold[:2])}")
+    return " · ".join(parts)
 
 
 def _news_body(cat: dict[str, Any], insight: dict[str, Any] | None = None) -> list[str]:
@@ -122,25 +217,11 @@ def _news_body(cat: dict[str, Any], insight: dict[str, Any] | None = None) -> li
     return lines
 
 
-def _ai_points_body(insight: dict[str, Any], deep: dict[str, Any]) -> list[str]:
-    lines: list[str] = []
-    brief = (insight.get("brief") or "").strip()
-    if brief:
-        parts = [p.strip() for p in re.split(r"[。！？\n；;，,]", brief) if p.strip()]
-        if len(parts) == 1:
-            lines.append(_bullet(_clip(parts[0], 42)))
-        else:
-            lines.extend(_bullet(_clip(p, 42)) for p in parts[:2])
-    summary = (deep.get("portfolio_summary") or "").strip()
-    if summary:
-        lines.append(_bullet(f"📊 {_clip(summary, 42)}"))
-    for rec in (deep.get("recommended") or [])[:3]:
-        name = rec.get("name") or rec.get("code")
-        rating = rec.get("reviewed_rating") or rec.get("rating") or ""
-        if name:
-            tag = f" [{rating}]" if rating else ""
-            lines.append(_bullet(f"✅ {name}{tag}"))
-    return lines
+def _tomorrow_action_body(data: dict[str, Any]) -> list[str]:
+    action = _tomorrow_action_line(data)
+    if not action:
+        return []
+    return [_bullet(action)]
 
 
 def _rotation_body(d: dict[str, Any], *, kind: str) -> list[str]:
@@ -171,11 +252,22 @@ def _rotation_body(d: dict[str, Any], *, kind: str) -> list[str]:
     return lines
 
 
-def _consecutive_body(cons: list[dict[str, Any]], *, limit: int = 3) -> list[str]:
+def _consecutive_body(
+    cons: list[dict[str, Any]],
+    *,
+    limit: int = 3,
+    min_boards: int = 2,
+    min_pct: float = 0,
+) -> list[str]:
     lines: list[str] = []
-    for x in cons[:limit]:
+    for x in cons:
+        boards = int(x.get("yesterday_boards") or 0)
         pct = float(x.get("change_pct") or 0)
-        lines.append(_bullet(f"{x.get('name')} {x.get('yesterday_boards')}板  {pct:+.1f}%"))
+        if boards < min_boards or pct < min_pct:
+            continue
+        lines.append(_bullet(f"{x.get('name')} {boards}板  {pct:+.1f}%"))
+        if len(lines) >= limit:
+            break
     return lines
 
 
@@ -220,16 +312,16 @@ def format_notify(data: dict[str, Any], kind: str) -> str:
 
     first = _append_section(lines, "轮动", _rotation_body(data, kind=kind), first=first)
 
-    insight = data.get("llm_insight") or {}
-    deep = data.get("deep_curation") or {}
-    first = _append_section(lines, "AI要点", _ai_points_body(insight, deep), first=first)
+    first = _append_section(lines, "明日动作", _tomorrow_action_body(data), first=first)
 
+    insight = data.get("llm_insight") or {}
     cat = data.get("news_catalyst") or {}
     first = _append_section(lines, "新闻前瞻", _news_body(cat, insight), first=first)
 
     sectors = data.get("top_sectors_by_fund_flow") or []
-    if sectors:
-        first = _append_section(lines, "资金主线 TOP3", format_mainline_sectors(sectors), first=first)
+    mainline = format_rotation_mainline(sectors)
+    if mainline:
+        first = _append_section(lines, "资金主线", mainline, first=first)
 
     cons = data.get("consecutive_limit_leaders") or []
     _append_section(lines, "连板", _consecutive_body(cons), first=first)
