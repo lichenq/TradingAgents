@@ -354,7 +354,10 @@ def build_summary(*, previous_snapshot: dict | None = None) -> dict:
     consecutive = _parse_consecutive(consecutive_raw)
 
     flow_inds = [it.get("industry", "") for it in items[:8]]
-    news_items = _fetch_market_news()
+    try:
+        news_items = _fetch_market_news()
+    except Exception:
+        news_items = []
     news_layer = _build_news_layer(flow_inds, news_items)
 
     result = {

@@ -68,7 +68,12 @@ latest_evening_sectors() {
 }
 
 latest_open_sectors() {
-  ls -t "$OUT_DIR"/*_open_sectors.json 2>/dev/null | head -1 || true
+  local f
+  for f in $(ls -t "$OUT_DIR"/*_open_sectors.json 2>/dev/null); do
+    [[ -s "$f" ]] || continue
+    echo "$f"
+    return 0
+  done
 }
 
 case "$MODE" in
@@ -84,8 +89,9 @@ case "$MODE" in
     SECTORS=$(latest_evening_sectors)
     ;;
   open)
-    "$ROOT/scripts/premarket_dryrun.sh" --node 9 >/dev/null
+    "$ROOT/scripts/premarket_dryrun.sh" --node 9 >/dev/null || true
     SECTORS=$(latest_open_sectors)
+    [[ -n "$SECTORS" ]] || { echo "open: node 9 failed (no open_sectors json)" >&2; exit 1; }
     ;;
   auction)
     "$ROOT/scripts/premarket_dryrun.sh" --node 8 >/dev/null || true

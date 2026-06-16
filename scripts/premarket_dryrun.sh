@@ -220,6 +220,7 @@ if should_run 9; then
     log "✓ Node 9 done open=$OPEN_SECTORS compare=${PREV_SECTORS:-none}"
     JSON_PARTS+=("\"9\":{\"name\":\"open-confirm\",\"ok\":true,\"elapsed_s\":$((SECONDS-t0)),\"output\":\"$OPEN_SECTORS\",\"compare_with\":\"${PREV_SECTORS:-}\"}")
   else
+    rm -f "$OPEN_SECTORS"
     JSON_PARTS+=("\"9\":{\"name\":\"open-confirm\",\"ok\":false,\"elapsed_s\":$((SECONDS-t0))}")
   fi
 fi
@@ -256,7 +257,7 @@ elif [[ -f "${OUT_DIR}/${RUN_ID}_open_sectors.json" ]]; then
 else
   SECTOR_SHOW=""
 fi
-if [[ -n "$SECTOR_SHOW" ]]; then
+if [[ -n "$SECTOR_SHOW" && -s "$SECTOR_SHOW" ]]; then
   "$PY" "$ROOT/scripts/premarket_sector_summary.py" --print "$SECTOR_SHOW"
 fi
 if [[ -f "${OUT_DIR}/${RUN_ID}_open_sectors.json" && -f "$SECTOR_JSON" && "$SECTOR_JSON" != "${OUT_DIR}/${RUN_ID}_open_sectors.json" ]]; then
