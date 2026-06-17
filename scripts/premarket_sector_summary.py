@@ -35,8 +35,6 @@ from tradingagents.graph.storage import query_report_flexible  # noqa: E402
 
 from tradingagents.dataflows.sector_mapping import (
     get_danginvest_boards,
-    get_eastmoney_concepts,
-    get_eastmoney_industries,
     get_match_names,
 )
 
@@ -44,8 +42,11 @@ A_SHARE = Path.home() / ".cursor/skills/a-share-data/run.sh"
 LIMIT_UP_POOL_TOP = int(os.environ.get("PREMARKET_LIMIT_UP_TOP", "500"))
 LIMIT_UP_CHG = float(os.environ.get("PREMARKET_LIMIT_UP_CHG", "9.5"))
 BOARD_PICKS_PER_SECTOR = int(os.environ.get("PREMARKET_BOARD_PICKS", "3"))
+BOARD_FETCH_MAX = int(os.environ.get("PREMARKET_BOARD_FETCH_MAX", "2"))
+BOARD_ITEMS_LIMIT = int(os.environ.get("PREMARKET_BOARD_ITEMS_LIMIT", "80"))
 TA_SCAN_MAX = int(os.environ.get("PREMARKET_TA_SCAN_MAX", "12"))
 RESULTS_DIR = Path(os.environ.get("TRADINGAGENTS_RESULTS_DIR", str(ROOT / "results")))
+_BOARD_ROWS_CACHE: dict[str, list[dict]] = {}
 
 
 def _trade_date() -> str:
@@ -148,6 +149,55 @@ def _parse_consecutive(rows: list) -> list[dict]:
     return out[:15]
 
 
+def _board_fetch_candidates(industry: str) -> list[str]:
+    names: list[str] = []
+    for n in get_danginvest_boards(industry) + [industry]:
+        n = (n or "").strip()
+        if n and n not in names:
+            names.append(n)
+    return names
+
+
+def _fetch_danginvest_board_rows(board_name: str) -> list[dict]:
+    cache_key = f"di:{board_name}"
+    if cache_key in _BOARD_ROWS_CACHE:
+        return _BOARD_ROWS_CACHE[cache_key]
+
+    rows: list[dict] = []
+    try:
+        payload = _run(
+            "fetch_realtime.py",
+            "--boards-detail",
+            "--boards-group-key",
+            board_name,
+            "--boards-items-limit",
+            str(BOARD_ITEMS_LIMIT),
+            "--json",
+        )
+        data = payload.get("data", {}) if isinstance(payload, dict) else {}
+        for item in data.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            code = _normalize_code(item.get("code"))
+            if not code:
+                continue
+            try:
+                chg = float(item.get("changePct") or 0)
+            except (TypeError, ValueError):
+                chg = 0.0
+            rows.append({
+                "code": code,
+                "name": str(item.get("name") or "").strip(),
+                "change_pct": round(chg, 2),
+            })
+    except Exception:
+        rows = []
+
+    rows.sort(key=lambda x: x["change_pct"], reverse=True)
+    _BOARD_ROWS_CACHE[cache_key] = rows
+    return rows
+
+
 def _fetch_em_board_rows(board_name: str, *, board_type: str) -> list[dict]:
     import akshare as ak
 
@@ -179,34 +229,39 @@ def _fetch_em_board_rows(board_name: str, *, board_type: str) -> list[dict]:
     return rows
 
 
-def _board_name_candidates(industry: str) -> list[str]:
-    names: list[str] = []
-    for n in get_eastmoney_industries(industry) + get_eastmoney_concepts(industry) + get_danginvest_boards(industry):
-        n = (n or "").strip()
-        if n and n not in names:
-            names.append(n)
-    if industry not in names:
-        names.insert(0, industry)
-    return names
+def _fetch_board_rows(board_name: str) -> list[dict]:
+    rows = _fetch_danginvest_board_rows(board_name)
+    if rows:
+        return rows
+    if os.environ.get("PREMARKET_BOARD_AKSHARE", "0").strip().lower() not in ("1", "true", "yes", "on"):
+        return []
+    for board_type in ("industry", "concept"):
+        rows = _fetch_em_board_rows(board_name, board_type=board_type)
+        if rows:
+            return rows
+    return []
 
 
 def _board_picks_for_sector(industry: str, limit_up_codes: set[str], limit: int = BOARD_PICKS_PER_SECTOR) -> list[dict]:
     picks: list[dict] = []
     seen: set[str] = set()
-    for name in _board_name_candidates(industry):
-        if len(picks) >= limit:
+    attempts = 0
+    fetch_max = int(os.environ.get("PREMARKET_BOARD_FETCH_MAX", str(BOARD_FETCH_MAX)))
+    for name in _board_fetch_candidates(industry):
+        if len(picks) >= limit or attempts >= fetch_max:
             break
-        for board_type in ("industry", "concept"):
-            for row in _fetch_em_board_rows(name, board_type=board_type):
-                code = row["code"]
-                if code in seen or code in limit_up_codes:
-                    continue
-                if row["change_pct"] >= LIMIT_UP_CHG:
-                    continue
-                seen.add(code)
-                picks.append(row)
-                if len(picks) >= limit:
-                    break
+        attempts += 1
+        rows = _fetch_board_rows(name)
+        if not rows:
+            continue
+        for row in rows:
+            code = row["code"]
+            if code in seen or code in limit_up_codes:
+                continue
+            if row["change_pct"] >= LIMIT_UP_CHG:
+                continue
+            seen.add(code)
+            picks.append(row)
             if len(picks) >= limit:
                 break
     picks.sort(key=lambda x: x["change_pct"], reverse=True)
@@ -327,11 +382,24 @@ def build_summary(*, previous_snapshot: dict | None = None) -> dict:
 
     hot_industries = Counter({ind: len(stocks) for ind, stocks in by_industry.items()}).most_common(8)
 
+    top_items = items[:8]
+    picks_by_industry: dict[str, list[dict]] = {}
+
+    def _fetch_sector_picks(it: dict) -> tuple[str, list[dict]]:
+        ind = it.get("industry", "")
+        return ind, _attach_report_ratings(_board_picks_for_sector(ind, limit_up_codes))
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futs = [pool.submit(_fetch_sector_picks, it) for it in top_items]
+        for fut in as_completed(futs):
+            ind, board_picks = fut.result()
+            picks_by_industry[ind] = board_picks
+
     sectors = []
     board_codes: list[str] = []
-    for it in items[:8]:
+    for it in top_items:
         ind = it.get("industry", "")
-        board_picks = _attach_report_ratings(_board_picks_for_sector(ind, limit_up_codes))
+        board_picks = picks_by_industry.get(ind, [])
         board_codes.extend(p["code"] for p in board_picks)
         sectors.append({
             "industry": ind,

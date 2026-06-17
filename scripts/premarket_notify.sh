@@ -24,14 +24,123 @@ WEIXIN_TARGET="${OPENCLAW_WEIXIN_TARGET:-o9cq809WYr9JuLYry23aicMuyckY@im.wechat}
 
 MODE="${1:-test}"
 
+ensure_openclaw_gateway() {
+  if "$OPENCLAW_BIN" gateway status 2>/dev/null | grep -q "Connectivity probe: ok"; then
+    return 0
+  fi
+  echo "openclaw gateway not reachable; restarting..." >&2
+  "$OPENCLAW_BIN" gateway restart >&2 || true
+  for _ in 1 2 3 4 5 6 10 12; do
+    sleep "$_"
+    if "$OPENCLAW_BIN" gateway status 2>/dev/null | grep -q "Connectivity probe: ok"; then
+      echo "openclaw gateway ready" >&2
+      return 0
+    fi
+  done
+  echo "openclaw gateway still unreachable after restart" >&2
+  return 1
+}
+
+check_weixin_session() {
+  local ctx_path="${HOME}/.openclaw/openclaw-weixin/accounts/${WEIXIN_ACCOUNT}.context-tokens.json"
+  if [[ -f "$ctx_path" ]] && CTX_PATH="$ctx_path" WEIXIN_TARGET="$WEIXIN_TARGET" "$PY" -c '
+import json, os, sys
+from pathlib import Path
+p = Path(os.environ["CTX_PATH"])
+t = os.environ.get("WEIXIN_TARGET", "")
+d = json.loads(p.read_text())
+if t in d and d[t]:
+    sys.exit(0)
+sys.exit(1)
+' 2>/dev/null; then
+    # Gateway 插件用内存会话 + context_token 发信；本地 bot_token 文件可能陈旧，勿用裸 API 探测误拦
+    return 0
+  fi
+  CHECK_WEIXIN_SESSION=1 WEIXIN_ACCOUNT="$WEIXIN_ACCOUNT" WEIXIN_TARGET="$WEIXIN_TARGET" "$PY" <<'PY'
+import json, os, sys, urllib.request
+from pathlib import Path
+
+home = Path.home()
+acc_path = home / ".openclaw/openclaw-weixin/accounts" / f"{os.environ['WEIXIN_ACCOUNT']}.json"
+ctx_path = home / ".openclaw/openclaw-weixin/accounts" / f"{os.environ['WEIXIN_ACCOUNT']}.context-tokens.json"
+if not acc_path.is_file():
+    print("weixin account file missing", file=sys.stderr)
+    sys.exit(2)
+acc = json.loads(acc_path.read_text())
+ctx_map = json.loads(ctx_path.read_text()) if ctx_path.is_file() else {}
+to = os.environ.get("WEIXIN_TARGET", "")
+body = json.dumps({
+    "msg": {
+        "from_user_id": "",
+        "to_user_id": to,
+        "client_id": "session-probe",
+        "message_type": 1,
+        "message_state": 2,
+        "item_list": [{"type": 1, "text_item": {"text": "session-probe"}}],
+        "context_token": ctx_map.get(to),
+    },
+    "base_info": {"bot_agent": "OpenClaw"},
+}).encode()
+req = urllib.request.Request(
+    f"{acc['baseUrl'].rstrip('/')}/ilink/bot/sendmessage",
+    data=body,
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {acc['token']}",
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        raw = resp.read().decode()
+except Exception as e:
+    print(f"weixin session probe failed: {e}", file=sys.stderr)
+    sys.exit(2)
+data = json.loads(raw)
+err = data.get("errcode", 0)
+if err == 0:
+    sys.exit(0)
+if err == -14:
+    print(
+        "weixin session timeout (errcode -14): bot_token 已过期。"
+        "扫码若提示「已连接过」不会刷新 token。"
+        "请先在微信里解除 OpenClaw 绑定，再执行 openclaw channels login --channel openclaw-weixin，"
+        "直到出现「已将此 OpenClaw 连接到微信」。",
+        file=sys.stderr,
+    )
+    sys.exit(14)
+print(f"weixin API errcode={err} errmsg={data.get('errmsg')}", file=sys.stderr)
+sys.exit(2)
+PY
+}
+
 send_weixin() {
   local msg="$1"
-  # 必须走 Gateway RPC：CLI `message send` 在独立进程里缺 contextToken，微信会静默丢消息
+  local ec=0
+  ensure_openclaw_gateway || return 1
+  check_weixin_session || ec=$?
+  if [[ "$ec" -ne 0 ]]; then
+    if [[ "$ec" == 14 ]]; then
+      echo "hint: 微信机器人会话已过期，需手机扫码: openclaw channels login --channel openclaw-weixin" >&2
+    fi
+    return "$ec"
+  fi
+  # Gateway RPC + accountId，插件侧会带上 contextToken
   local params
   params=$(MSG="$msg" WEIXIN_TARGET="$WEIXIN_TARGET" WEIXIN_CHANNEL="$WEIXIN_CHANNEL" \
     WEIXIN_ACCOUNT="$WEIXIN_ACCOUNT" IDEMPOTENCY_KEY="premarket-$(date +%s)-$$" \
     "$PY" -c 'import json, os; print(json.dumps({"to": os.environ["WEIXIN_TARGET"], "message": os.environ["MSG"], "channel": os.environ["WEIXIN_CHANNEL"], "accountId": os.environ["WEIXIN_ACCOUNT"], "idempotencyKey": os.environ["IDEMPOTENCY_KEY"]}))')
-  "$OPENCLAW_BIN" gateway call send --params "$params" --json
+  local out
+  if ! out=$("$OPENCLAW_BIN" gateway call send --params "$params" --json 2>&1); then
+    echo "$out" >&2
+    return 1
+  fi
+  echo "$out"
+  if echo "$out" | grep -q '"messageId"'; then
+    return 0
+  fi
+  echo "weixin send returned no messageId" >&2
+  return 1
 }
 
 format_msg() {
@@ -122,8 +231,16 @@ case "$MODE" in
     send_weixin "$MSG"
     exit 0
     ;;
+  open-send)
+    SECTORS=$(latest_open_sectors)
+    [[ -n "$SECTORS" ]] || { echo "no open_sectors json; run premarket_dryrun --node 9 first" >&2; exit 1; }
+    MSG=$(format_msg open "$SECTORS")
+    echo "$MSG"
+    send_weixin "$MSG"
+    exit 0
+    ;;
   *)
-    echo "usage: $0 {test|evening|evening-send|open|auction|exhaustion}" >&2
+    echo "usage: $0 {test|evening|evening-send|open|open-send|auction|exhaustion}" >&2
     exit 1
     ;;
 esac
