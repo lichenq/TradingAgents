@@ -4,5 +4,6 @@ __pycache__/
 cache/
 .s*.json
 .quote*
-_*
+_*.txt
+_*.jsonl
 .tradingagents/
