@@ -24,6 +24,9 @@ from tradingagents.agents.utils.structured import (
     invoke_structured_or_freetext,
 )
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
+from tradingagents.dataflows.audit_pm_context import format_audit_kpi_mandate
+from tradingagents.dataflows.config import get_config
+from tradingagents.graph.debate_context import format_risk_debate_history
 
 
 def _build_gatekeeping_mandate() -> str:
@@ -84,7 +87,7 @@ def create_portfolio_manager(llm):
     def portfolio_manager_node(state) -> dict:
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        history = state["risk_debate_state"]["history"]
+        history = format_risk_debate_history(state, llm)
         risk_debate_state = state["risk_debate_state"]
         research_plan = state["investment_plan"]
         trader_plan = state["trader_investment_plan"]
@@ -94,6 +97,14 @@ def create_portfolio_manager(llm):
             f"- Lessons from prior decisions and outcomes:\n{past_context}\n"
             if past_context
             else ""
+        )
+        quality_notes = (state.get("report_quality_notes") or "").strip()
+        quality_block = f"\n{quality_notes}\n" if quality_notes else ""
+
+        cfg = get_config()
+        audit_kpi = format_audit_kpi_mandate(
+            cfg.get("results_dir") or "results",
+            strategy=cfg.get("recommend_strategy"),
         )
 
         gatekeeping = _build_gatekeeping_mandate()
@@ -107,18 +118,24 @@ def create_portfolio_manager(llm):
 
 ---
 
+{audit_kpi}
+
+---
+
 {gatekeeping}
 
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
 - Trader's transaction proposal: **{trader_plan}**
 {lessons_line}
+{quality_block}
 **Risk Analysts Debate History:**
 {history}
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts. Critically evaluate their fact-credibility and logic chain reliability.{get_language_instruction()}"""
+Be decisive and ground every conclusion in specific evidence from the analysts. Critically evaluate their fact-credibility and logic chain reliability.
+Populate evidence_citations with 2-5 items quoting verified facts or named analyst findings; never invent PE/PB/price.{get_language_instruction()}"""
 
         prompt = append_verified_market_facts(prompt, state)
         final_trade_decision = invoke_structured_or_freetext(
@@ -132,6 +149,7 @@ Be decisive and ground every conclusion in specific evidence from the analysts. 
         new_risk_debate_state = {
             "judge_decision": final_trade_decision,
             "history": risk_debate_state["history"],
+            "summary": risk_debate_state.get("summary", ""),
             "aggressive_history": risk_debate_state["aggressive_history"],
             "conservative_history": risk_debate_state["conservative_history"],
             "neutral_history": risk_debate_state["neutral_history"],

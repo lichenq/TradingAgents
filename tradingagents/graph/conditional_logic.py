@@ -2,6 +2,7 @@
 
 from tradingagents.agents.utils.agent_states import AgentState
 from tradingagents.agents.utils.analyst_threads import last_message_in_thread
+from tradingagents.graph.debate_context import should_end_investment_debate
 
 
 class ConditionalLogic:
@@ -67,6 +68,8 @@ class ConditionalLogic:
         if (
             state["investment_debate_state"]["count"] >= 2 * self.max_debate_rounds
         ):  # 3 rounds of back-and-forth between 2 agents
+            return "Research Manager"
+        if should_end_investment_debate(state):
             return "Research Manager"
         if state["investment_debate_state"]["current_response"].startswith("Bull"):
             return "Bear Researcher"

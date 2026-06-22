@@ -8,6 +8,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_language_instruction,
 )
+from tradingagents.agents.utils.analyst_output_format import ANALYST_REPORT_SECTIONS
 from tradingagents.dataflows.config import get_config
 from tradingagents.agents.utils.analyst_threads import (
     analyst_invoke_messages,
@@ -90,6 +91,7 @@ def create_fundamentals_analyst(llm, *, analyst_thread_key: str | None = None):
             + f" Use the available tools: {tool_hint}."
             + get_language_instruction()
             + _P_COCT_FUNDAMENTALS_RULES
+            + ANALYST_REPORT_SECTIONS
         )
         if is_cn:
             system_message += _CN_DATA_RULES

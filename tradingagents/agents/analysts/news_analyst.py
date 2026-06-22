@@ -9,7 +9,7 @@ from tradingagents.agents.utils.analyst_threads import (
     analyst_invoke_messages,
     analyst_node_return,
 )
-from tradingagents.dataflows.config import get_config
+from tradingagents.agents.utils.analyst_output_format import ANALYST_REPORT_SECTIONS
 
 
 _P_COCT_NEWS_RULES = (
@@ -43,6 +43,7 @@ def create_news_analyst(llm, *, analyst_thread_key: str | None = None):
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + get_language_instruction()
             + _P_COCT_NEWS_RULES
+            + ANALYST_REPORT_SECTIONS
         )
 
         prompt = ChatPromptTemplate.from_messages(

@@ -517,7 +517,15 @@ class TradingMemoryLog:
     def _format_reflection_only(self, e: dict) -> str:
         tag = f"[{e['date']} | {e['ticker']} | {e['rating']} | {e['raw'] or 'n/a'}]"
         if e["reflection"]:
-            return f"{tag}\n{e['reflection']}"
+            body = e["reflection"]
+            if body.startswith("FAILURE_MODE:"):
+                lines = body.split("\n", 1)
+                mode = lines[0].replace("FAILURE_MODE:", "").strip()
+                prose = lines[1].strip() if len(lines) > 1 else ""
+                if mode and mode.lower() != "none":
+                    return f"{tag}\n[{mode}] {prose}"
+                return f"{tag}\n{prose}"
+            return f"{tag}\n{body}"
         text = e["decision"][:300]
         suffix = "..." if len(e["decision"]) > 300 else ""
         return f"{tag}\n{text}{suffix}"

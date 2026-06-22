@@ -72,7 +72,27 @@ def _truncate_report(text: str, limit: int) -> str:
     body = (text or "").strip()
     if len(body) <= limit:
         return body
-    return body[:limit] + "\n\n[... report truncated for context limit ...]"
+    anchors = (
+        "## Portfolio Manager",
+        "**Rating**",
+        "行情硬数据",
+        "Verified Market Facts",
+        "final_trade_decision",
+    )
+    preserved: List[str] = []
+    for marker in anchors:
+        idx = body.find(marker)
+        if idx < 0:
+            continue
+        preserved.append(body[idx : idx + min(3500, len(body) - idx)])
+    preserved_text = "\n\n".join(preserved).strip()
+    head_budget = max(0, limit - len(preserved_text) - 80)
+    head = body[:head_budget] if head_budget else ""
+    parts = [p for p in (head, preserved_text) if p]
+    joined = "\n\n[... report truncated; decision tail preserved ...]\n\n".join(parts)
+    if len(joined) <= limit:
+        return joined
+    return joined[:limit] + "\n\n[... report truncated for context limit ...]"
 
 
 def _stitch_report_sections(row: Dict[str, Any]) -> str:

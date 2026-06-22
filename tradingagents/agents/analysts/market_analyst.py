@@ -5,56 +5,89 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
     get_stock_data,
 )
+from tradingagents.agents.utils.analyst_output_format import (
+    ANALYST_REPORT_SECTIONS,
+    EVIDENCE_TIER_RULES,
+)
 from tradingagents.agents.utils.analyst_threads import (
     analyst_invoke_messages,
     analyst_node_return,
 )
+from tradingagents.dataflows.cn_prefetch import get_prefetched
 from tradingagents.dataflows.config import get_config
+from tradingagents.market import cn_uses_a_share_skill, normalize_a_share_code
+
+
+_CN_MARKET_RULES = """
+## A 股技术面纪律
+- 考虑涨跌停（±10%/±20%）、T+1、ST、科创板/创业板规则对信号的影响。
+- 量价须结合：缩量反弹 vs 放量突破；北向/主力资金流向（若有预取块）须交叉验证。
+- 估值数字（PE/PB/现价）只能引用下方预取/硬数据，禁止估算。
+"""
+
+_US_INDICATOR_CATALOG = """
+Moving Averages:
+- close_50_sma: 50 SMA: medium-term trend
+- close_200_sma: 200 SMA: long-term benchmark
+- close_10_ema: 10 EMA: short-term momentum
+MACD: macd, macds, macdh
+Momentum: rsi
+Volatility: boll, boll_ub, boll_lb, atr
+Volume: vwma
+Select up to 8 complementary indicators. Call get_stock_data first, then get_indicators.
+"""
+
+
+def _build_cn_system_message(ticker: str, trade_date: str, prefetched: str) -> str:
+    return f"""你是一名 A 股市场技术分析师。基于下方预取的 K 线/资金流数据，为 {ticker} 撰写截至 {trade_date} 的技术面报告。
+禁止编造未出现在数据中的价格、指标或量能。
+
+## 预取数据（撰写须以此为准）
+{prefetched or "(预取为空 — 说明数据缺口，勿猜测)"}
+
+{_CN_MARKET_RULES}
+{EVIDENCE_TIER_RULES}
+{ANALYST_REPORT_SECTIONS}
+{get_language_instruction()}"""
+
+
+def _build_us_system_message() -> str:
+    return (
+        "You are a trading assistant analyzing financial markets. Select up to 8 "
+        "complementary indicators from:\n"
+        + _US_INDICATOR_CATALOG
+        + "\nWrite a detailed trend report with actionable insights."
+        + EVIDENCE_TIER_RULES
+        + ANALYST_REPORT_SECTIONS
+        + get_language_instruction()
+    )
 
 
 def create_market_analyst(llm, *, analyst_thread_key: str | None = None):
 
     def market_analyst_node(state):
         current_date = state["trade_date"]
+        ticker = state["company_of_interest"]
         asset_type = state.get("asset_type", "stock")
-        instrument_context = build_instrument_context(
-            state["company_of_interest"], asset_type
-        )
+        instrument_context = build_instrument_context(ticker, asset_type)
+        cfg = get_config()
+        is_cn = cn_uses_a_share_skill(ticker, cfg)
 
-        tools = [
-            get_stock_data,
-            get_indicators,
-        ]
+        tools = [get_stock_data, get_indicators]
 
-        system_message = (
-            """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy. Categories and each category's indicators are:
-
-Moving Averages:
-- close_50_sma: 50 SMA: A medium-term trend indicator. Usage: Identify trend direction and serve as dynamic support/resistance. Tips: It lags price; combine with faster indicators for timely signals.
-- close_200_sma: 200 SMA: A long-term trend benchmark. Usage: Confirm overall market trend and identify golden/death cross setups. Tips: It reacts slowly; best for strategic trend confirmation rather than frequent trading entries.
-- close_10_ema: 10 EMA: A responsive short-term average. Usage: Capture quick shifts in momentum and potential entry points. Tips: Prone to noise in choppy markets; use alongside longer averages for filtering false signals.
-
-MACD Related:
-- macd: MACD: Computes momentum via differences of EMAs. Usage: Look for crossovers and divergence as signals of trend changes. Tips: Confirm with other indicators in low-volatility or sideways markets.
-- macds: MACD Signal: An EMA smoothing of the MACD line. Usage: Use crossovers with the MACD line to trigger trades. Tips: Should be part of a broader strategy to avoid false positives.
-- macdh: MACD Histogram: Shows the gap between the MACD line and its signal. Usage: Visualize momentum strength and spot divergence early. Tips: Can be volatile; complement with additional filters in fast-moving markets.
-
-Momentum Indicators:
-- rsi: RSI: Measures momentum to flag overbought/oversold conditions. Usage: Apply 70/30 thresholds and watch for divergence to signal reversals. Tips: In strong trends, RSI may remain extreme; always cross-check with trend analysis.
-
-Volatility Indicators:
-- boll: Bollinger Middle: A 20 SMA serving as the basis for Bollinger Bands. Usage: Acts as a dynamic benchmark for price movement. Tips: Combine with the upper and lower bands to effectively spot breakouts or reversals.
-- boll_ub: Bollinger Upper Band: Typically 2 standard deviations above the middle line. Usage: Signals potential overbought conditions and breakout zones. Tips: Confirm signals with other tools; prices may ride the band in strong trends.
-- boll_lb: Bollinger Lower Band: Typically 2 standard deviations below the middle line. Usage: Indicates potential oversold conditions. Tips: Use additional analysis to avoid false reversal signals.
-- atr: ATR: Averages true range to measure volatility. Usage: Set stop-loss levels and adjust position sizes based on current market volatility. Tips: It's a reactive measure, so use it as part of a broader risk management strategy.
-
-Volume-Based Indicators:
-- vwma: VWMA: A moving average weighted by volume. Usage: Confirm trends by integrating price action with volume data. Tips: Watch for skewed results from volume spikes; use in combination with other volume analyses.
-
-- Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. Please make sure to call get_stock_data first to retrieve the CSV that is needed to generate indicators. Then use get_indicators with the specific indicator names. Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
-            + get_language_instruction()
-        )
+        if is_cn:
+            code6 = normalize_a_share_code(ticker)
+            blocks = []
+            for key in (f"kline:{code6}", f"fund_flow:{code6}"):
+                block = get_prefetched(key)
+                if block:
+                    blocks.append(block)
+            prefetched = "\n\n".join(blocks)
+            system_message = _build_cn_system_message(ticker, current_date, prefetched)
+            if prefetched.strip():
+                tools = []
+        else:
+            system_message = _build_us_system_message()
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -78,13 +111,14 @@ Volume-Based Indicators:
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
-        chain = prompt | llm.bind_tools(tools)
-
+        if tools:
+            chain = prompt | llm.bind_tools(tools)
+        else:
+            chain = prompt | llm
         result = chain.invoke(analyst_invoke_messages(state, analyst_thread_key))
 
         report = ""
-
-        if len(result.tool_calls) == 0:
+        if not getattr(result, "tool_calls", None):
             report = result.content
 
         return analyst_node_return(

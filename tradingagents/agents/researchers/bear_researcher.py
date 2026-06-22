@@ -1,6 +1,11 @@
 from tradingagents.agents.utils.agent_utils import get_language_instruction
+from tradingagents.agents.utils.past_context import past_context_prompt_block
 from tradingagents.agents.utils.position_context import get_position_assumption_instruction
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
+from tradingagents.graph.debate_context import (
+    format_investment_debate_history,
+    maybe_refresh_investment_summary,
+)
 
 
 def _safe_report(text: str) -> str:
@@ -11,9 +16,8 @@ def _safe_report(text: str) -> str:
 def create_bear_researcher(llm):
     def bear_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
-        history = investment_debate_state.get("history", "")
+        raw_history = investment_debate_state.get("history", "")
         bear_history = investment_debate_state.get("bear_history", "")
-
         current_response = investment_debate_state.get("current_response", "")
         market_research_report = _safe_report(state["market_report"])
         sentiment_report = _safe_report(state["sentiment_report"])
@@ -26,6 +30,9 @@ def create_bear_researcher(llm):
             if asset_type == "stock"
             else "Asset fundamentals report (may be unavailable for crypto)"
         )
+        debate_context = format_investment_debate_history(state, llm)
+        quality_notes = (state.get("report_quality_notes") or "").strip()
+        quality_block = f"\n\n{quality_notes}\n" if quality_notes else ""
 
         prompt = f"""You are a Bear Analyst making the case against investing in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
 
@@ -38,26 +45,30 @@ Key points to focus on:
 - Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning or declining innovation.
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
 - Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
+- Cite which analyst report section supports each claim; down-weight low-quality flagged reports.
 
 Resources available:
 Market research report: {market_research_report}
 Social media sentiment report: {sentiment_report}
 Latest world affairs news: {news_report}
 {fundamentals_label}: {fundamentals_report}
-Conversation history of the debate: {history}
+{quality_block}
+Conversation history of the debate: {debate_context}
 Last bull argument: {current_response}
 Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the {target_label}.
-""" + get_position_assumption_instruction() + get_language_instruction()
+""" + past_context_prompt_block(state.get("past_context", ""), "bear_researcher") + get_position_assumption_instruction() + get_language_instruction()
 
         prompt = append_verified_market_facts(prompt, state)
         response = llm.invoke(prompt)
 
         argument = f"Bear Analyst: {response.content}"
+        summary = maybe_refresh_investment_summary(state, llm)
 
         new_investment_debate_state = {
-            "history": history + "\n" + argument,
+            "history": raw_history + "\n" + argument,
             "bear_history": bear_history + "\n" + argument,
             "bull_history": investment_debate_state.get("bull_history", ""),
+            "summary": summary,
             "current_response": argument,
             "count": investment_debate_state["count"] + 1,
         }

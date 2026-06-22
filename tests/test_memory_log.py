@@ -34,7 +34,10 @@ DECISION_NO_RATING = (
 # ---------------------------------------------------------------------------
 
 def make_log(tmp_path, filename="trading_memory.md"):
-    config = {"memory_log_path": str(tmp_path / filename)}
+    config = {
+        "memory_log_backend": "file",
+        "memory_log_path": str(tmp_path / filename),
+    }
     return TradingMemoryLog(config)
 
 
@@ -68,6 +71,7 @@ def _make_pm_state(past_context=""):
         "past_context": past_context,
         "risk_debate_state": {
             "history": "Risk debate history.",
+            "summary": "",
             "aggressive_history": "",
             "conservative_history": "",
             "neutral_history": "",
@@ -113,9 +117,10 @@ class TestTradingMemoryLogCore:
 
     def test_store_creates_file(self, tmp_path):
         log = make_log(tmp_path)
-        assert not (tmp_path / "trading_memory.md").exists()
+        path = tmp_path / "trading_memory.md"
+        assert path.exists() and path.stat().st_size == 0
         log.store_decision("NVDA", "2026-01-10", DECISION_BUY)
-        assert (tmp_path / "trading_memory.md").exists()
+        assert path.stat().st_size > 0
 
     def test_store_appends_not_overwrites(self, tmp_path):
         log = make_log(tmp_path)
@@ -490,7 +495,7 @@ class TestDeferredReflection:
         result = reflector.reflect_on_final_decision(
             final_decision=DECISION_BUY, raw_return=0.042, alpha_return=0.021
         )
-        assert result == "Directionally correct. Thesis confirmed."
+        assert result == "FAILURE_MODE: other\nDirectionally correct. Thesis confirmed."
         mock_llm.invoke.assert_called_once()
 
     def test_reflect_on_final_decision_includes_returns_in_prompt(self):
@@ -648,16 +653,22 @@ class TestDeferredReflection:
 
     # TradingAgentsGraph._resolve_pending_entries
 
-    def test_resolve_skips_other_tickers(self, tmp_path):
-        """Pending AAPL entry is not resolved when the run is for NVDA."""
+    def test_resolve_all_pending_entries(self, tmp_path):
+        """Pending entries for any ticker are resolved when outcome data exists."""
         log = make_log(tmp_path)
         log.store_decision("AAPL", "2026-01-10", DECISION_BUY)
+        mock_reflector = MagicMock()
+        mock_reflector.reflect_on_final_decision.return_value = (
+            "FAILURE_MODE: timing\nToo early."
+        )
         mock_graph = MagicMock(spec=TradingAgentsGraph)
         mock_graph.memory_log = log
+        mock_graph.reflector = mock_reflector
+        mock_graph._resolve_benchmark = MagicMock(return_value="SPY")
         mock_graph._fetch_returns = MagicMock(return_value=(0.05, 0.02, 5))
         TradingAgentsGraph._resolve_pending_entries(mock_graph, "NVDA")
-        mock_graph._fetch_returns.assert_not_called()
-        assert len(log.get_pending_entries()) == 1
+        mock_graph._fetch_returns.assert_called_once()
+        assert log.get_pending_entries() == []
 
     def test_resolve_marks_entry_completed(self, tmp_path):
         """After resolve, get_pending_entries() is empty and the entry has a REFLECTION."""

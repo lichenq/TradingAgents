@@ -11,6 +11,7 @@ from tradingagents.agents.utils.analyst_threads import create_thread_tool_node, 
 
 from .analyst_execution import build_analyst_execution_plan
 from .analyst_join import ANALYST_JOIN_NODE, analysts_join_node
+from .analyst_quality_gate import ANALYST_QUALITY_GATE_NODE, analyst_quality_gate_node
 from .conditional_logic import ConditionalLogic
 
 
@@ -109,6 +110,8 @@ class GraphSetup:
         if parallel_analysts:
             workflow.add_node(ANALYST_JOIN_NODE, analysts_join_node)
 
+        workflow.add_node(ANALYST_QUALITY_GATE_NODE, analyst_quality_gate_node)
+
         # Analyst tool loops + routing (sequential chain or parallel fan-out)
         for i, spec in enumerate(plan.specs):
             current_analyst = spec.agent_node
@@ -132,17 +135,19 @@ class GraphSetup:
             elif i < len(plan.specs) - 1:
                 workflow.add_edge(current_clear, plan.specs[i + 1].agent_node)
             else:
-                workflow.add_edge(current_clear, "Bull Researcher")
+                workflow.add_edge(current_clear, ANALYST_QUALITY_GATE_NODE)
 
         if parallel_analysts:
             workflow.add_conditional_edges(
                 ANALYST_JOIN_NODE,
                 self.conditional_logic.should_continue_after_analyst_join,
                 {
-                    "continue": "Bull Researcher",
+                    "continue": ANALYST_QUALITY_GATE_NODE,
                     "wait": ANALYST_JOIN_NODE,
                 },
             )
+
+        workflow.add_edge(ANALYST_QUALITY_GATE_NODE, "Bull Researcher")
 
         # Add remaining edges
         workflow.add_conditional_edges(

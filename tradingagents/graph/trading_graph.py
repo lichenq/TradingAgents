@@ -268,27 +268,20 @@ class TradingAgentsGraph:
             return None, None, None
 
     def _resolve_pending_entries(self, ticker: str) -> None:
-        """Resolve pending log entries for ticker at the start of a new run.
-
-        Fetches returns for each same-ticker pending entry, generates reflections,
-        then writes all updates in a single atomic batch write to avoid redundant I/O.
-        Skips entries whose price data is not yet available (too recent or delisted).
-
-        Trade-off: only same-ticker entries are resolved per run.  Entries for
-        other tickers accumulate until that ticker is run again.
-        """
-        pending = [e for e in self.memory_log.get_pending_entries() if e["ticker"] == ticker]
+        """Resolve all pending log entries whose outcome data is available."""
+        pending = self.memory_log.get_pending_entries()
         if not pending:
             return
 
-        benchmark = self._resolve_benchmark(ticker)
         updates = []
         for entry in pending:
+            entry_ticker = entry["ticker"]
+            benchmark = self._resolve_benchmark(entry_ticker)
             raw, alpha, days = self._fetch_returns(
-                ticker, entry["date"], benchmark=benchmark,
+                entry_ticker, entry["date"], benchmark=benchmark,
             )
             if raw is None:
-                continue  # price not available yet — try again next run
+                continue
             reflection = self.reflector.reflect_on_final_decision(
                 final_decision=entry.get("decision", ""),
                 raw_return=raw,
@@ -296,7 +289,7 @@ class TradingAgentsGraph:
                 benchmark_name=benchmark,
             )
             updates.append({
-                "ticker": ticker,
+                "ticker": entry_ticker,
                 "trade_date": entry["date"],
                 "raw_return": raw,
                 "alpha_return": alpha,

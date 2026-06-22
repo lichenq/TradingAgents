@@ -19,6 +19,9 @@ labels=(
   com.tradingagents.premarket.open
   com.tradingagents.premarket.exhaustion
   com.tradingagents.premarket.verify
+  com.tradingagents.prepump.intraday
+  com.tradingagents.prepump.confirm
+  com.tradingagents.prepump.morning
 )
 
 render_plist() {
@@ -42,8 +45,9 @@ bootstrap_one() {
 }
 
 install_all() {
-  mkdir -p "$ROOT/logs/premarket" "$ROOT/results/premarket_dryrun/jobs"
-  chmod +x "$ROOT/scripts/premarket_jobs.sh" "$ROOT/scripts/verify_recommendation_loop.sh"
+  mkdir -p "$ROOT/logs/premarket" "$ROOT/results/premarket_dryrun/jobs" "$ROOT/logs/prepump"
+  chmod +x "$ROOT/scripts/premarket_jobs.sh" "$ROOT/scripts/verify_recommendation_loop.sh" \
+    "$ROOT/scripts/prepump_notify.sh"
 
   if [[ ! -f "$ROOT/scripts/premarket_jobs.env" ]]; then
     cp "$ROOT/scripts/premarket_jobs.env.example" "$ROOT/scripts/premarket_jobs.env"

@@ -19,7 +19,7 @@ so that:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -51,6 +51,35 @@ class TraderAction(str, Enum):
     BUY = "Buy"
     HOLD = "Hold"
     SELL = "Sell"
+
+
+class ReflectionFailureMode(str, Enum):
+    """Primary failure mode when a past decision underperformed."""
+
+    NONE = "none"
+    HALLUCINATION = "hallucination"
+    TIMING = "timing"
+    MACRO = "macro"
+    VALUATION = "valuation"
+    SENTIMENT = "sentiment"
+    OTHER = "other"
+
+
+class ReflectionOutcome(BaseModel):
+    failure_mode: ReflectionFailureMode = Field(
+        description=(
+            "Primary reason the call was wrong or weak: none if direction was "
+            "correct; otherwise hallucination / timing / macro / valuation / "
+            "sentiment / other."
+        ),
+    )
+    reflection: str = Field(
+        description="2-4 sentences of plain prose: outcome vs alpha, what failed, one lesson.",
+    )
+
+
+def format_reflection_storage(outcome: ReflectionOutcome) -> str:
+    return f"FAILURE_MODE: {outcome.failure_mode.value}\n{outcome.reflection.strip()}"
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +239,14 @@ class PortfolioDecision(BaseModel):
         default=None,
         description="Optional recommended holding period, e.g. '3-6 months'.",
     )
+    evidence_citations: List[str] = Field(
+        default_factory=list,
+        description=(
+            "2-5 short citations grounding the rating: quote numbers from "
+            "verified market facts or name specific analyst findings. "
+            "Do not invent PE/PB/price."
+        ),
+    )
 
 
 def render_pm_decision(decision: PortfolioDecision) -> str:
@@ -231,4 +268,8 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
     if decision.time_horizon:
         parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+    if decision.evidence_citations:
+        parts.extend(["", "**Evidence Citations**:"])
+        for cite in decision.evidence_citations:
+            parts.append(f"- {cite}")
     return "\n".join(parts)

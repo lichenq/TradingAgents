@@ -35,6 +35,7 @@ class Propagator:
                     "bull_history": "",
                     "bear_history": "",
                     "history": "",
+                    "summary": "",
                     "current_response": "",
                     "judge_decision": "",
                     "count": 0,
@@ -46,6 +47,7 @@ class Propagator:
                     "conservative_history": "",
                     "neutral_history": "",
                     "history": "",
+                    "summary": "",
                     "latest_speaker": "",
                     "current_aggressive_response": "",
                     "current_conservative_response": "",
@@ -59,6 +61,7 @@ class Propagator:
             "sentiment_report": "",
             "news_report": "",
             "verified_market_facts": "",
+            "report_quality_notes": "",
         }
         if parallel_analysts:
             state["analyst_threads"] = {}

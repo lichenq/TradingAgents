@@ -19,10 +19,58 @@ if ! command -v "$OPENCLAW_BIN" >/dev/null 2>&1 && [[ -x "$HOME/.npm-global/bin/
 fi
 
 WEIXIN_CHANNEL="${OPENCLAW_WEIXIN_CHANNEL:-openclaw-weixin}"
-WEIXIN_ACCOUNT="${OPENCLAW_WEIXIN_ACCOUNT:-6af8255c243c-im-bot}"
-WEIXIN_TARGET="${OPENCLAW_WEIXIN_TARGET:-o9cq809WYr9JuLYry23aicMuyckY@im.wechat}"
+WEIXIN_ACCOUNT="${OPENCLAW_WEIXIN_ACCOUNT:-}"
+WEIXIN_TARGET="${OPENCLAW_WEIXIN_TARGET:-}"
 
 MODE="${1:-test}"
+
+resolve_weixin_credentials() {
+  local acc_dir="$HOME/.openclaw/openclaw-weixin/accounts"
+  local accounts_json="$HOME/.openclaw/openclaw-weixin/accounts.json"
+  if [[ -z "$WEIXIN_ACCOUNT" && -f "$accounts_json" ]]; then
+    WEIXIN_ACCOUNT=$("$PY" -c "import json; from pathlib import Path; ids=json.loads(Path('$accounts_json').read_text()); print(ids[-1] if ids else '')")
+  fi
+  if [[ -z "$WEIXIN_ACCOUNT" ]]; then
+    echo "weixin account missing: set OPENCLAW_WEIXIN_ACCOUNT or run: openclaw channels login --channel openclaw-weixin" >&2
+    return 1
+  fi
+  local acc_file="$acc_dir/${WEIXIN_ACCOUNT}.json"
+  if [[ ! -f "$acc_file" ]]; then
+    echo "weixin account file missing ($acc_file)" >&2
+    echo "请先扫码登录: openclaw channels login --channel openclaw-weixin" >&2
+    return 1
+  fi
+  if [[ -z "$WEIXIN_TARGET" ]]; then
+    WEIXIN_TARGET=$("$PY" -c "import json; print(json.load(open('$acc_file')).get('userId',''))")
+  fi
+  if [[ -z "$WEIXIN_TARGET" ]]; then
+    echo "weixin target missing: set OPENCLAW_WEIXIN_TARGET" >&2
+    return 1
+  fi
+}
+
+ensure_weixin_context() {
+  WEIXIN_ACCOUNT="$WEIXIN_ACCOUNT" WEIXIN_TARGET="$WEIXIN_TARGET" "$PY" <<'PY'
+import json, os, sys
+from pathlib import Path
+
+acc = os.environ["WEIXIN_ACCOUNT"]
+to = os.environ["WEIXIN_TARGET"]
+ctx_path = Path.home() / ".openclaw/openclaw-weixin/accounts" / f"{acc}.context-tokens.json"
+if not ctx_path.is_file():
+    sys.exit(1)
+if json.loads(ctx_path.read_text()).get(to):
+    sys.exit(0)
+sys.exit(1)
+PY
+  if [[ $? -eq 0 ]]; then
+    return 0
+  fi
+  echo "weixin 会话未建立（缺少 contextToken）" >&2
+  echo "重登后须先在微信给 OpenClaw 机器人发任意消息（如 ping），等 3～5 秒再推送。" >&2
+  echo "检查: ls ~/.openclaw/openclaw-weixin/accounts/${WEIXIN_ACCOUNT}.context-tokens.json" >&2
+  return 3
+}
 
 ensure_openclaw_gateway() {
   if "$OPENCLAW_BIN" gateway status 2>/dev/null | grep -q "Connectivity probe: ok"; then
@@ -42,20 +90,6 @@ ensure_openclaw_gateway() {
 }
 
 check_weixin_session() {
-  local ctx_path="${HOME}/.openclaw/openclaw-weixin/accounts/${WEIXIN_ACCOUNT}.context-tokens.json"
-  if [[ -f "$ctx_path" ]] && CTX_PATH="$ctx_path" WEIXIN_TARGET="$WEIXIN_TARGET" "$PY" -c '
-import json, os, sys
-from pathlib import Path
-p = Path(os.environ["CTX_PATH"])
-t = os.environ.get("WEIXIN_TARGET", "")
-d = json.loads(p.read_text())
-if t in d and d[t]:
-    sys.exit(0)
-sys.exit(1)
-' 2>/dev/null; then
-    # Gateway 插件用内存会话 + context_token 发信；本地 bot_token 文件可能陈旧，勿用裸 API 探测误拦
-    return 0
-  fi
   CHECK_WEIXIN_SESSION=1 WEIXIN_ACCOUNT="$WEIXIN_ACCOUNT" WEIXIN_TARGET="$WEIXIN_TARGET" "$PY" <<'PY'
 import json, os, sys, urllib.request
 from pathlib import Path
@@ -102,10 +136,11 @@ if err == 0:
     sys.exit(0)
 if err == -14:
     print(
-        "weixin session timeout (errcode -14): bot_token 已过期。"
-        "扫码若提示「已连接过」不会刷新 token。"
-        "请先在微信里解除 OpenClaw 绑定，再执行 openclaw channels login --channel openclaw-weixin，"
-        "直到出现「已将此 OpenClaw 连接到微信」。",
+        "weixin session timeout (errcode -14): 会话已过期。\n"
+        "微信里可能没有「解除绑定」入口，请改用本地重置：\n"
+        "  ./scripts/openclaw_weixin_relogin.sh\n"
+        "  openclaw channels login --channel openclaw-weixin\n"
+        "扫码应出现「已将此 OpenClaw 连接到微信」（不是「已连接过」）。",
         file=sys.stderr,
     )
     sys.exit(14)
@@ -116,15 +151,9 @@ PY
 
 send_weixin() {
   local msg="$1"
-  local ec=0
+  resolve_weixin_credentials || return 1
   ensure_openclaw_gateway || return 1
-  check_weixin_session || ec=$?
-  if [[ "$ec" -ne 0 ]]; then
-    if [[ "$ec" == 14 ]]; then
-      echo "hint: 微信机器人会话已过期，需手机扫码: openclaw channels login --channel openclaw-weixin" >&2
-    fi
-    return "$ec"
-  fi
+  ensure_weixin_context || return 3
   # Gateway RPC + accountId，插件侧会带上 contextToken
   local params
   params=$(MSG="$msg" WEIXIN_TARGET="$WEIXIN_TARGET" WEIXIN_CHANNEL="$WEIXIN_CHANNEL" \
@@ -239,8 +268,15 @@ case "$MODE" in
     send_weixin "$MSG"
     exit 0
     ;;
+  prepump-send)
+    MSG="${PREPUMP_MSG:-}"
+    [[ -n "$MSG" ]] || { echo "PREPUMP_MSG empty" >&2; exit 1; }
+    echo "$MSG"
+    send_weixin "$MSG"
+    exit 0
+    ;;
   *)
-    echo "usage: $0 {test|evening|evening-send|open|open-send|auction|exhaustion}" >&2
+    echo "usage: $0 {test|evening|evening-send|open|open-send|auction|exhaustion|prepump-send}" >&2
     exit 1
     ;;
 esac
