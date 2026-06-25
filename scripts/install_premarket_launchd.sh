@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 安装 / 卸载 macOS LaunchAgents 定时任务
+# 安装 / 卸载 macOS LaunchAgents（audit + verify）
 # Usage:
 #   ./scripts/install_premarket_launchd.sh install
 #   ./scripts/install_premarket_launchd.sh uninstall
@@ -14,11 +14,15 @@ DOMAIN="gui/$UID_NUM"
 
 labels=(
   com.tradingagents.premarket.audit
+  com.tradingagents.premarket.verify
+)
+
+# Legacy labels removed from install; bootout on uninstall if still present.
+legacy_labels=(
   com.tradingagents.premarket.evening
   com.tradingagents.premarket.auction
   com.tradingagents.premarket.open
   com.tradingagents.premarket.exhaustion
-  com.tradingagents.premarket.verify
   com.tradingagents.prepump.intraday
   com.tradingagents.prepump.confirm
   com.tradingagents.prepump.morning
@@ -45,14 +49,18 @@ bootstrap_one() {
 }
 
 install_all() {
-  mkdir -p "$ROOT/logs/premarket" "$ROOT/results/premarket_dryrun/jobs" "$ROOT/logs/prepump"
-  chmod +x "$ROOT/scripts/premarket_jobs.sh" "$ROOT/scripts/verify_recommendation_loop.sh" \
-    "$ROOT/scripts/prepump_notify.sh"
+  mkdir -p "$ROOT/logs/premarket" "$ROOT/results/audit_jobs"
+  chmod +x "$ROOT/scripts/premarket_jobs.sh" "$ROOT/scripts/verify_recommendation_loop.sh"
 
   if [[ ! -f "$ROOT/scripts/premarket_jobs.env" ]]; then
     cp "$ROOT/scripts/premarket_jobs.env.example" "$ROOT/scripts/premarket_jobs.env"
     echo "Created scripts/premarket_jobs.env from example"
   fi
+
+  for label in "${legacy_labels[@]}"; do
+    bootout_one "$label"
+    rm -f "$LAUNCH_AGENTS/$label.plist"
+  done
 
   for label in "${labels[@]}"; do
     src="$PLIST_SRC/$label.plist"
@@ -69,7 +77,7 @@ install_all() {
 }
 
 uninstall_all() {
-  for label in "${labels[@]}"; do
+  for label in "${labels[@]}" "${legacy_labels[@]}"; do
     bootout_one "$label"
     rm -f "$LAUNCH_AGENTS/$label.plist"
     echo "removed $label"

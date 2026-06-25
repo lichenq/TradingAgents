@@ -253,32 +253,10 @@ def run_health_checks(
             )
         )
 
-    fc_path = results_dir / "forecast_accuracy" / "latest.json"
-    fc_age = _file_age_days(fc_path)
-    if fc_age is None:
-        findings.append(
-            HealthFinding(
-                "warn",
-                "forecast_accuracy_missing",
-                "forecast_accuracy/latest.json missing (need open --compare runs)",
-            )
-        )
-    else:
-        try:
-            fc = json.loads(fc_path.read_text(encoding="utf-8"))
-            demoted = fc.get("demoted_categories") or []
-            rec_n = int(fc.get("records") or 0)
-            msg = f"forecast accuracy records={rec_n}"
-            if demoted:
-                msg += f" demoted={demoted}"
-            level = "warn" if demoted else "ok"
-            findings.append(HealthFinding(level, "forecast_accuracy", msg))
-        except (json.JSONDecodeError, OSError):
-            findings.append(
-                HealthFinding("warn", "forecast_accuracy_invalid", "Cannot read forecast accuracy")
-            )
-
-    job_dir = results_dir / "premarket_dryrun" / "jobs"
+    job_dir = results_dir / "audit_jobs"
+    if not job_dir.is_dir():
+        legacy = results_dir / "premarket_dryrun" / "jobs"
+        job_dir = legacy if legacy.is_dir() else job_dir
     audit_log_age = _latest_job_log_age(job_dir, "audit")
     if audit_log_age is None:
         findings.append(
@@ -316,8 +294,7 @@ def run_health_checks(
     if cfg["require_launchd"]:
         labels = [
             "com.tradingagents.premarket.audit",
-            "com.tradingagents.premarket.evening",
-            "com.tradingagents.premarket.open",
+            "com.tradingagents.premarket.verify",
         ]
         findings.extend(check_launchd_agents(labels))
 

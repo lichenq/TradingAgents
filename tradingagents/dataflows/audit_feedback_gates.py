@@ -8,8 +8,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from tradingagents.agents.utils.rating import RATINGS_5_TIER
-from tradingagents.dataflows.audit_report import fetch_enriched_audits
 from tradingagents.dataflows.sector_mapping import resolve as resolve_sector
+
+
+def _fetch_enriched_audits(*args, **kwargs):
+    from tradingagents.dataflows.audit_report import fetch_enriched_audits
+
+    return fetch_enriched_audits(*args, **kwargs)
 
 BEARISH_RATINGS = {r for r in RATINGS_5_TIER if r in ("Hold", "Underweight", "Sell")}
 
@@ -68,7 +73,7 @@ def evaluate_strategy_audit_gate(
 ) -> Dict[str, Any]:
     """Return whether strategy is allowed based on recent audit win rate."""
     cfg = audit_gate_config()
-    enriched = fetch_enriched_audits(
+    enriched = _fetch_enriched_audits(
         results_dir,
         lookback_days=cfg["lookback_days"],
         as_of=as_of,
@@ -154,7 +159,7 @@ def build_cautious_sectors(
 ) -> Dict[str, Dict[str, Any]]:
     """Sectors with >= N losing audits and at least one bearish rating that was correct."""
     cfg = audit_gate_config()
-    enriched = fetch_enriched_audits(
+    enriched = _fetch_enriched_audits(
         results_dir,
         lookback_days=cfg["lookback_days"],
         as_of=as_of,

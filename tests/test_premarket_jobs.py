@@ -20,8 +20,9 @@ class TestPremarketJobs(unittest.TestCase):
             text=True,
         )
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("evening", proc.stdout)
-        self.assertIn("09:35", proc.stdout)
+        self.assertIn("audit", proc.stdout)
+        self.assertIn("15:05", proc.stdout)
+        self.assertIn("verify", proc.stdout)
 
 
 if __name__ == "__main__":
