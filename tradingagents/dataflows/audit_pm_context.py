@@ -10,6 +10,7 @@ from tradingagents.dataflows.audit_feedback_gates import (
     evaluate_strategy_audit_gate,
 )
 from tradingagents.dataflows.backtest_audit_context import audit_win_rate_summary
+from tradingagents.dataflows.audit_failure_modes import format_failure_mode_summary
 
 
 def format_audit_kpi_mandate(
@@ -40,6 +41,9 @@ def format_audit_kpi_mandate(
             lines.append(
                 "- **负 alpha 环境**：优先 Hold/Underweight，强调防守与止损。"
             )
+        fail_summary = format_failure_mode_summary(results_dir, lookback_days=30, top_n=3)
+        if fail_summary:
+            lines.append(f"- **{fail_summary}**")
     else:
         lines.append("- 暂无足够审计样本；仍须遵守 verified facts 与证据分级。")
 

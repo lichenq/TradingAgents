@@ -36,6 +36,7 @@ class TestAuditRecommendationQuery(unittest.TestCase):
                     "reason": "trend",
                     "metrics": {},
                     "report_paths": {},
+                    "is_final": 1,
                 },
             )
             save_recommendation(
@@ -47,10 +48,27 @@ class TestAuditRecommendationQuery(unittest.TestCase):
                     "name": "江海股份",
                     "score": 70.0,
                     "price": 80.0,
-                    "rating": "Hold",
+                    "rating": "Buy",
                     "reason": "hot",
                     "metrics": {},
                     "report_paths": {},
+                    "is_final": 1,
+                },
+            )
+            save_recommendation(
+                tmp,
+                "2026-06-08",
+                "trend_pullback",
+                {
+                    "code": "sz000001",
+                    "name": "HoldOnly",
+                    "score": 60.0,
+                    "price": 10.0,
+                    "rating": "Hold",
+                    "reason": "watch",
+                    "metrics": {},
+                    "report_paths": {},
+                    "is_final": 1,
                 },
             )
             db_path = f"{tmp}/trading_agents.db"
@@ -61,6 +79,7 @@ class TestAuditRecommendationQuery(unittest.TestCase):
                 side_effect=lambda rec_date, as_of: {
                     ("2026-06-12", date(2026, 6, 15)): 1,
                     ("2026-06-10", date(2026, 6, 15)): 3,
+                    ("2026-06-08", date(2026, 6, 15)): 5,
                 }[(rec_date, as_of)],
             ):
                 ready = get_recommendations_to_audit(conn, audit_days=3, as_of=date(2026, 6, 15))
@@ -69,6 +88,7 @@ class TestAuditRecommendationQuery(unittest.TestCase):
             codes = {r["code"] for r in ready}
             self.assertIn("sz002484", codes)
             self.assertNotIn("sz300408", codes)
+            self.assertNotIn("sz000001", codes)
 
 
 if __name__ == "__main__":

@@ -750,6 +750,27 @@ def main() -> int:
             f"min_volume_amount ×{regime_params.min_volume_multiplier:.1f} (regime)"
         )
 
+    audit_max_pe: Optional[float] = None
+    try:
+        from tradingagents.dataflows.audit_stage1_tune import compute_audit_stage1_tune
+
+        audit_tune = compute_audit_stage1_tune(config["results_dir"], args.strategy)
+        if audit_tune.validate_top_cap < 99:
+            prev = args.validate_top
+            args.validate_top = min(args.validate_top, audit_tune.validate_top_cap)
+            if args.validate_top != prev:
+                prog.step(f"audit tune validate_top {prev} → {args.validate_top}")
+        if audit_tune.min_volume_multiplier != 1.0:
+            args.min_volume_amount *= audit_tune.min_volume_multiplier
+            prog.step(
+                f"min_volume_amount ×{audit_tune.min_volume_multiplier:.1f} (audit)"
+            )
+        audit_max_pe = audit_tune.max_pe_cap
+        if audit_tune.note:
+            prog.step(f"audit tune: {audit_tune.note}")
+    except Exception as exc:
+        prog.step(f"audit tune skipped: {exc}")
+
     # =====================================================================
     # STAGE 1: Fast Quantitative screening
     # =====================================================================
@@ -1061,14 +1082,38 @@ def main() -> int:
 
             if cautious_sectors:
                 from tradingagents.dataflows.audit_feedback_gates import (
+                    evaluate_global_pe_cap_gate,
                     evaluate_sector_high_pe_gate,
                 )
+
+                pe_flagged, pe_reason = evaluate_global_pe_cap_gate(
+                    code, trade_date, audit_max_pe, config
+                )
+                if pe_flagged:
+                    prog.step(f"剔除 {name}({code[-6:]}) audit PE: {pe_reason[:60]}...")
+                    item["prune_reason"] = pe_reason
+                    pruned_list.append(item)
+                    continue
 
                 pe_flagged, pe_reason = evaluate_sector_high_pe_gate(
                     code, trade_date, cautious_sectors, config
                 )
                 if pe_flagged:
                     prog.step(f"剔除 {name}({code[-6:]}) 复盘门禁: {pe_reason[:60]}...")
+                    item["prune_reason"] = pe_reason
+                    pruned_list.append(item)
+                    continue
+
+            elif audit_max_pe is not None:
+                from tradingagents.dataflows.audit_feedback_gates import (
+                    evaluate_global_pe_cap_gate,
+                )
+
+                pe_flagged, pe_reason = evaluate_global_pe_cap_gate(
+                    code, trade_date, audit_max_pe, config
+                )
+                if pe_flagged:
+                    prog.step(f"剔除 {name}({code[-6:]}) audit PE: {pe_reason[:60]}...")
                     item["prune_reason"] = pe_reason
                     pruned_list.append(item)
                     continue
@@ -1091,6 +1136,7 @@ def main() -> int:
     parallel_config["output_language"] = "Chinese"
     parallel_config["checkpoint_enabled"] = False
     parallel_config["recommend_force"] = args.force
+    parallel_config["recommend_strategy"] = args.strategy
     # 单线程深度研判时沿用 analyze 的节点级进度；多线程仅打每只耗时
     use_graph_progress = args.concurrency <= 1 and len(valid_shortlist) == 1
     parallel_config["progress_logging"] = use_graph_progress
@@ -1127,18 +1173,6 @@ def main() -> int:
                         validated_results.append(res)
         else:
             prog.step("无候选股，跳过深度研判")
-
-    try:
-        from tradingagents.graph.storage import save_recommendation_to_sqlite
-
-        for r in validated_results:
-            save_recommendation_to_sqlite(r, args.strategy, trade_date)
-        if validated_results:
-            prog.step(
-                f"Stage2 共 {len(validated_results)} 只已入库 SQLite（含 Hold/Underweight）"
-            )
-    except Exception as e:
-        logger.warning(f"Failed to sync Stage2 results to SQLite: {e}")
 
     # =====================================================================
     # STAGE 3: Read full reports → curate final list → export
@@ -1248,8 +1282,11 @@ def main() -> int:
         try:
             from tradingagents.graph.storage import save_recommendation_to_sqlite
             for r in recommended_stocks:
+                r["is_final"] = 1
                 save_recommendation_to_sqlite(r, args.strategy, trade_date)
-            prog.step("已将推荐结果同步至本地 SQLite 数据库中")
+            prog.step(
+                f"Stage3 最终推荐 {len(recommended_stocks)} 只已入库 SQLite（is_final=1）"
+            )
         except Exception as e:
             logger.warning(f"Failed to sync recommendations to SQLite: {e}")
 

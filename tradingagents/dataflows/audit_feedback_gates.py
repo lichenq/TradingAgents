@@ -200,6 +200,39 @@ def _ticker_code6(ticker: str) -> str:
     return "".join(ch for ch in str(ticker or "") if ch.isdigit())[-6:]
 
 
+def evaluate_global_pe_cap_gate(
+    code: str,
+    trade_date: str,
+    max_pe: Optional[float],
+    config: Dict[str, Any],
+) -> Tuple[bool, str]:
+    """Stage1 prune when audit tuning lowered global PE cap."""
+    if max_pe is None:
+        return False, ""
+
+    from tradingagents.dataflows.cn_valuation import fetch_cn_valuation_payload
+
+    code6 = _ticker_code6(code)
+    ok, payload, _ = fetch_cn_valuation_payload(code6, trade_date, config)
+    if not ok or not isinstance(payload, dict):
+        return False, ""
+
+    pe = payload.get("pe_ttm")
+    if pe is None:
+        return False, ""
+    try:
+        pe_f = float(pe)
+    except (TypeError, ValueError):
+        return False, ""
+
+    if pe_f <= 0 or pe_f <= max_pe:
+        return False, ""
+
+    return True, (
+        f"audit PE 上限: PE TTM {pe_f:.1f}x > {max_pe:.0f}x（复盘 high_pe_loss 收紧）"
+    )
+
+
 def evaluate_sector_high_pe_gate(
     code: str,
     trade_date: str,

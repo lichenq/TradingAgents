@@ -106,6 +106,7 @@ def build_audit_report(
     by_strategy: Dict[str, List[float]] = {}
     by_rating: Dict[str, List[float]] = {}
     by_horizon: Dict[str, List[float]] = {}
+    by_failure_mode: Dict[str, List[float]] = {}
 
     for row in enriched:
         ret = row.get("raw_return")
@@ -115,6 +116,19 @@ def build_audit_report(
         by_strategy.setdefault(str(row.get("strategy") or "unknown"), []).append(ret_f)
         by_rating.setdefault(str(row.get("rating") or "unknown"), []).append(ret_f)
         by_horizon.setdefault(str(row.get("days_elapsed") or "unknown"), []).append(ret_f)
+        raw_modes = row.get("failure_modes")
+        modes: List[str] = []
+        if isinstance(raw_modes, list):
+            modes = [str(m) for m in raw_modes]
+        elif isinstance(raw_modes, str) and raw_modes.strip():
+            try:
+                parsed = json.loads(raw_modes)
+                if isinstance(parsed, list):
+                    modes = [str(m) for m in parsed]
+            except json.JSONDecodeError:
+                modes = [raw_modes]
+        for mode in modes or ["untagged"]:
+            by_failure_mode.setdefault(mode, []).append(ret_f)
 
     def _map_buckets_list(src: Dict[str, List[float]]) -> Dict[str, Dict[str, Any]]:
         return {k: _bucket_stats(v) for k, v in sorted(src.items())}
@@ -156,6 +170,7 @@ def build_audit_report(
         "by_strategy": _map_buckets_list(by_strategy),
         "by_rating": _map_buckets_list(by_rating),
         "by_horizon": _map_buckets_list(by_horizon),
+        "by_failure_mode": _map_buckets_list(by_failure_mode),
         "recent_cases": recent_cases,
         "rating_calibration": rating_calibration,
         "forecast_accuracy": forecast_accuracy,

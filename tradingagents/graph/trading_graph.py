@@ -411,11 +411,13 @@ class TradingAgentsGraph:
         # Initialize state — inject memory log + post-audit lessons for PM.
         past_context = self.memory_log.get_past_context(company_name)
         try:
-            from tradingagents.dataflows.backtest_audit_context import format_backtest_audit_context
+            from tradingagents.dataflows.backtest_audit_context import (
+                format_compact_audit_context,
+            )
 
-            audit_ctx = format_backtest_audit_context(
+            audit_ctx = format_compact_audit_context(
                 self.config.get("results_dir") or "results",
-                limit=8,
+                limit=5,
                 ticker=company_name,
             )
             if audit_ctx:

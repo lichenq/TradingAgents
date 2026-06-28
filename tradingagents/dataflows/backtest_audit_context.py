@@ -79,3 +79,64 @@ def format_backtest_audit_context(
         "do not chase high-PE momentum when audits show Hold/Underweight was correct."
     )
     return "\n".join(lines)
+
+
+def format_compact_audit_context(
+    results_dir: str | Path,
+    *,
+    limit: int = 5,
+    ticker: Optional[str] = None,
+) -> str:
+    """Short PM block: KPI + failure-mode counts + 1-2 recent cases."""
+    stats = audit_win_rate_summary(results_dir, limit=30)
+    if not stats["count"]:
+        return ""
+
+    wr = stats["win_rate"]
+    ar = stats["avg_return"]
+    wr_s = f"{wr:.0%}" if wr is not None else "N/A"
+    ar_s = f"{ar:+.1%}" if ar is not None else "N/A"
+    lines = [
+        f"Post-audit KPI (last {stats['count']}): win_rate={wr_s}, avg_return={ar_s}.",
+    ]
+
+    try:
+        from tradingagents.dataflows.audit_failure_modes import format_failure_mode_summary
+
+        summary = format_failure_mode_summary(results_dir, lookback_days=30, top_n=3)
+        if summary:
+            lines.append(summary + " — downgrade repeat offenders.")
+    except Exception:
+        pass
+
+    rows = query_backtest_audits(results_dir, ticker=ticker, limit=limit)
+    shown = 0
+    for r in rows:
+        if shown >= 2:
+            break
+        ret = r.get("raw_return")
+        if ret is None:
+            continue
+        code6 = _ticker_code6(str(r.get("ticker") or ""))
+        ret_s = f"{float(ret):+.1%}"
+        modes = r.get("failure_modes") or ""
+        if modes and not str(modes).startswith("["):
+            mode_s = str(modes)[:40]
+        else:
+            import json
+
+            try:
+                parsed = json.loads(modes) if modes else []
+                mode_s = ",".join(parsed[:2]) if parsed else ""
+            except json.JSONDecodeError:
+                mode_s = ""
+        tail = f" [{mode_s}]" if mode_s else ""
+        lines.append(
+            f"Case {code6} +{r.get('days_elapsed')}d {ret_s}{tail}"
+        )
+        shown += 1
+
+    lines.append(
+        "Use KPI + failure modes; do not chase high-PE momentum after high_pe_loss streaks."
+    )
+    return "\n".join(lines)

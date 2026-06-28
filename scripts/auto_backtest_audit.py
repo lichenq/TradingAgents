@@ -29,6 +29,10 @@ if str(project_root) not in sys.path:
 
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.dataflows.a_share_runner import run_script
+from tradingagents.dataflows.audit_failure_modes import (
+    classify_failure_modes,
+    fetch_pe_ttm,
+)
 from tradingagents.dataflows.audit_report import write_audit_report
 from tradingagents.dataflows.trade_date import cn_trading_sessions_after
 from tradingagents.graph.storage import get_db_path, init_db, query_report, save_backtest_audit
@@ -73,8 +77,13 @@ def get_recommendations_to_audit(
 
     cursor.execute("""
         SELECT r.* FROM recommendations r
-        LEFT JOIN backtest_audits b ON r.code = b.ticker AND r.trade_date = b.recommendation_date AND b.days_elapsed = ?
+        LEFT JOIN backtest_audits b
+          ON r.code = b.ticker
+         AND r.trade_date = b.recommendation_date
+         AND b.days_elapsed = ?
         WHERE b.id IS NULL
+          AND COALESCE(r.is_final, 0) = 1
+          AND r.rating IN ('Buy', 'Overweight')
     """, (audit_days,))
 
     rows = [dict(row) for row in cursor.fetchall()]
@@ -217,6 +226,13 @@ def main() -> int:
             # 2. Calculate return
             total_return = (current_price - initial_price) / initial_price
             logger.info(f"Backtest Outcome: Initial={initial_price:.2f} CNY, Current={current_price:.2f} CNY, Return={total_return:+.2%}")
+
+            pe_ttm = fetch_pe_ttm(code, trade_date, DEFAULT_CONFIG)
+            failure_modes = classify_failure_modes(
+                r, total_return, pe_ttm=pe_ttm
+            )
+            if failure_modes:
+                logger.info(f"Failure modes: {', '.join(failure_modes)}")
             
             # 3. Pull deep report if it exists
             deep_report_text = None
@@ -249,7 +265,8 @@ def main() -> int:
                 initial_price=initial_price,
                 end_price=current_price,
                 raw_return=total_return,
-                reflection=reflection
+                reflection=reflection,
+                failure_modes=failure_modes,
             )
             logger.info(f"Audit saved to SQLite backtest_audits for {name} ({code6}). Reflection: {reflection[:80]}...\n")
             
@@ -265,6 +282,8 @@ def main() -> int:
                     f.write(f"- **Current Price**: {current_price:.2f} CNY\n")
                     f.write(f"- **Backtest Horizon**: {args.days_ago} days\n")
                     f.write(f"- **Return**: {total_return:+.2%}\n")
+                    if failure_modes:
+                        f.write(f"- **Failure Modes**: {', '.join(failure_modes)}\n")
                     f.write(f"- **AI Quant/Risk Reflection Insights**:\n  > {reflection}\n\n")
                 logger.info(f"Appended reflection insights to: {ledger_path}")
             except Exception as e:

@@ -293,6 +293,7 @@ def run_health_checks(
 
     if cfg["require_launchd"]:
         labels = [
+            "com.tradingagents.recommend.daily",
             "com.tradingagents.premarket.audit",
             "com.tradingagents.premarket.verify",
         ]

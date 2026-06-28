@@ -69,9 +69,16 @@ def init_db(results_dir_or_db_path: str | Path) -> None:
                 reason TEXT,
                 metrics TEXT,
                 report_paths TEXT,
+                is_final INTEGER DEFAULT 0,
                 created_at TEXT
             )
         """)
+        cursor.execute("PRAGMA table_info(recommendations)")
+        rec_columns = {row[1] for row in cursor.fetchall()}
+        if "is_final" not in rec_columns:
+            cursor.execute(
+                "ALTER TABLE recommendations ADD COLUMN is_final INTEGER DEFAULT 0"
+            )
         
         # Table: reports (Stage 2 deep multi-agent reports)
         cursor.execute("""
@@ -119,10 +126,17 @@ def init_db(results_dir_or_db_path: str | Path) -> None:
                 end_price REAL,
                 raw_return REAL,
                 reflection TEXT,
+                failure_modes TEXT,
                 created_at TEXT,
                 UNIQUE(ticker, recommendation_date, days_elapsed)
             )
         """)
+        cursor.execute("PRAGMA table_info(backtest_audits)")
+        audit_columns = {row[1] for row in cursor.fetchall()}
+        if "failure_modes" not in audit_columns:
+            cursor.execute(
+                "ALTER TABLE backtest_audits ADD COLUMN failure_modes TEXT"
+            )
 
         # Table: sector_rotation (Sector rotation forecasts & probabilities)
         cursor.execute("""
@@ -167,10 +181,12 @@ def save_recommendation(
             (trade_date, rec.get("code"), strategy)
         )
         
+        is_final = int(rec.get("is_final") or 0)
         cursor.execute("""
             INSERT INTO recommendations (
-                trade_date, strategy, code, name, score, price, rating, reason, metrics, report_paths, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                trade_date, strategy, code, name, score, price, rating, reason,
+                metrics, report_paths, is_final, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             trade_date,
             strategy,
@@ -182,6 +198,7 @@ def save_recommendation(
             rec.get("reason"),
             metrics_json,
             report_paths_json,
+            is_final,
             created_at
         ))
         conn.commit()
@@ -600,6 +617,7 @@ def save_backtest_audit(
     end_price: float,
     raw_return: float,
     reflection: str,
+    failure_modes: Optional[List[str]] = None,
     db_path: Optional[str | Path] = None
 ) -> None:
     """Save or replace a backtest audit with its AI reflection in SQLite."""
@@ -610,11 +628,12 @@ def save_backtest_audit(
         cursor = conn.cursor()
         created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        modes_json = json.dumps(failure_modes or [], ensure_ascii=False)
         cursor.execute("""
             INSERT OR REPLACE INTO backtest_audits (
                 ticker, recommendation_date, audit_date, days_elapsed,
-                initial_price, end_price, raw_return, reflection, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                initial_price, end_price, raw_return, reflection, failure_modes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             ticker,
             recommendation_date,
@@ -624,6 +643,7 @@ def save_backtest_audit(
             end_price,
             raw_return,
             reflection,
+            modes_json,
             created_at
         ))
         conn.commit()

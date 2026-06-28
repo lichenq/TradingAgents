@@ -13,6 +13,7 @@ UID_NUM="$(id -u)"
 DOMAIN="gui/$UID_NUM"
 
 labels=(
+  com.tradingagents.recommend.daily
   com.tradingagents.premarket.audit
   com.tradingagents.premarket.verify
 )
