@@ -23,9 +23,11 @@ legacy_labels=(
   com.tradingagents.premarket.auction
   com.tradingagents.premarket.open
   com.tradingagents.premarket.exhaustion
+  com.tradingagents.prepump.evening
   com.tradingagents.prepump.intraday
   com.tradingagents.prepump.confirm
   com.tradingagents.prepump.morning
+  com.user.a-share-prepump-scan
 )
 
 render_plist() {
