@@ -433,6 +433,13 @@ class TradingAgentsGraph:
 
             verified_market_facts = require_cn_valuation_ready(company_name, self.config)
             require_cn_technical_ready(company_name)
+            from tradingagents.dataflows.limit_entry_rules import enrich_verified_with_entry_levels
+
+            verified_market_facts = enrich_verified_with_entry_levels(
+                verified_market_facts,
+                company_name,
+                str(trade_date),
+            )
             code6 = normalize_a_share_code(company_name)
             events_payload = get_prefetched_json(f"events_raw:{code6}")
             scheduled_event_alerts = build_scheduled_alerts(events_payload, str(trade_date))
