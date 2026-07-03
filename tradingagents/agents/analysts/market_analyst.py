@@ -77,15 +77,25 @@ def create_market_analyst(llm, *, analyst_thread_key: str | None = None):
 
         if is_cn:
             code6 = normalize_a_share_code(ticker)
+            required = {
+                f"kline:{code6}": "K线",
+                f"technical:{code6}": "技术指标(MA/MACD/RSI/BOLL)",
+            }
             blocks = []
-            for key in (f"kline:{code6}", f"fund_flow:{code6}"):
+            for key, label in required.items():
                 block = get_prefetched(key)
-                if block:
-                    blocks.append(block)
+                if not (block or "").strip():
+                    raise RuntimeError(
+                        f"A-share {label} prefetch missing for {code6}; "
+                        "aborting market analysis."
+                    )
+                blocks.append(block)
+            fund_flow = get_prefetched(f"fund_flow:{code6}")
+            if fund_flow:
+                blocks.append(fund_flow)
             prefetched = "\n\n".join(blocks)
             system_message = _build_cn_system_message(ticker, current_date, prefetched)
-            if prefetched.strip():
-                tools = []
+            tools = []
         else:
             system_message = _build_us_system_message()
 

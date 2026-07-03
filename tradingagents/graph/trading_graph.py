@@ -268,8 +268,18 @@ class TradingAgentsGraph:
             return None, None, None
 
     def _resolve_pending_entries(self, ticker: str) -> None:
-        """Resolve all pending log entries whose outcome data is available."""
+        """Resolve pending log entries whose outcome data is available."""
         pending = self.memory_log.get_pending_entries()
+        max_resolve = int(self.config.get("max_pending_resolve_per_run", 2))
+        if max_resolve <= 0:
+            return
+        if len(pending) > max_resolve:
+            logger.info(
+                "Skipping %d pending memory-log entries (cap=%d); will retry next run",
+                len(pending) - max_resolve,
+                max_resolve,
+            )
+            pending = pending[:max_resolve]
         if not pending:
             return
 
@@ -321,7 +331,22 @@ class TradingAgentsGraph:
 
         self.ticker = company_name
 
-        # Resolve any pending memory-log entries for this ticker before the pipeline runs.
+        progress_logger = None
+        if progress_logging_enabled(self.config):
+            progress_logger = GraphProgressLogger(company_name, str(trade_date))
+            progress_logger.log_start()
+
+        pending = self.memory_log.get_pending_entries()
+        max_resolve = int(self.config.get("max_pending_resolve_per_run", 2))
+        if pending and progress_logger and max_resolve > 0:
+            n = min(len(pending), max_resolve)
+            skipped = len(pending) - n
+            msg = f"回放 {n} 条历史 pending 决策（LLM 复盘）"
+            if skipped:
+                msg += f"，跳过 {skipped} 条"
+            progress_logger.log_phase(msg)
+
+        # Resolve pending memory-log entries before the pipeline runs.
         self._resolve_pending_entries(company_name)
 
         # Recompile with a checkpointer if the user opted in.
@@ -343,14 +368,25 @@ class TradingAgentsGraph:
                 logger.info("Starting fresh for %s on %s", company_name, trade_date)
 
         try:
-            return self._run_graph(company_name, trade_date, asset_type=asset_type)
+            return self._run_graph(
+                company_name,
+                trade_date,
+                asset_type=asset_type,
+                progress_logger=progress_logger,
+            )
         finally:
             if self._checkpointer_ctx is not None:
                 self._checkpointer_ctx.__exit__(None, None, None)
                 self._checkpointer_ctx = None
                 self.graph = self.workflow.compile()
 
-    def _run_graph(self, company_name, trade_date, asset_type: str = "stock"):
+    def _run_graph(
+        self,
+        company_name,
+        trade_date,
+        asset_type: str = "stock",
+        progress_logger: Optional[GraphProgressLogger] = None,
+    ):
         """Execute the graph and write the resulting state to disk and memory log."""
         self.config = apply_ticker_news_queries(company_name, self.config)
         set_config(self.config)
@@ -376,20 +412,31 @@ class TradingAgentsGraph:
         verified_market_facts = ""
         if cn_uses_a_share_skill(company_name, self.config):
             workers = max(1, int(self.config.get("analyst_concurrency_limit", 4)))
+            if progress_logger:
+                progress_logger.log_phase(
+                    f"并行预取 A 股数据（{workers} 路，约 1 分钟）"
+                )
+                progress_logger.set_activity_kind("data")
             prefetch_lines = run_cn_prefetch(
                 company_name,
                 str(trade_date),
                 self.config,
                 max_workers=workers,
             )
+            from tradingagents.dataflows.cn_technical import require_cn_technical_ready
             from tradingagents.dataflows.cn_valuation import require_cn_valuation_ready
 
             verified_market_facts = require_cn_valuation_ready(company_name, self.config)
+            require_cn_technical_ready(company_name)
             progress_extra = (
                 [f"分析师并行度: {workers}（市场/情绪/新闻/基本面同时跑）"]
                 + prefetch_lines[:8]
                 + progress_extra
             )
+            if progress_logger:
+                for line in progress_extra:
+                    progress_logger.log_detail(line)
+                progress_logger.set_activity_kind("llm")
 
         from tradingagents.agents.utils.position_holdings import (
             enrich_verified_with_position_holdings,
@@ -436,6 +483,57 @@ class TradingAgentsGraph:
         )
         if verified_market_facts:
             init_agent_state["verified_market_facts"] = verified_market_facts
+
+        tuige_setup = (self.config.get("tuige_setup") or "").strip()
+        tuige_ctx_dict: Optional[Dict[str, Any]] = None
+        tuige_position_grade = (self.config.get("tuige_position_grade") or "").strip()
+        if not tuige_setup or not tuige_position_grade:
+            try:
+                from tradingagents.tuige.context import build_tuige_context, tuige_enabled
+                from tradingagents.tuige.position_grade import (
+                    derive_position_grade,
+                    format_tuige_summary,
+                )
+                from tradingagents.tuige.setup_classifier import classify_setup_from_code
+
+                if tuige_enabled() and cn_uses_a_share_skill(company_name, self.config):
+                    if not tuige_setup:
+                        cls = classify_setup_from_code(company_name, str(trade_date))
+                        if cls and cls.setup != "unclassified":
+                            tuige_setup = cls.setup
+                    from tradingagents.tuige.market_inputs import fetch_tuige_market_inputs
+
+                    market = fetch_tuige_market_inputs(str(trade_date))
+                    ctx = build_tuige_context(
+                        str(trade_date),
+                        ticker=company_name,
+                        quotes=market.quotes,
+                        index_payload=market.index_payload,
+                        industry_flows=market.industry_flows,
+                        tuige_setup=tuige_setup or None,
+                    )
+                    if ctx.enabled:
+                        tuige_ctx_dict = ctx.to_dict()
+                        if not tuige_position_grade:
+                            tuige_position_grade = derive_position_grade(
+                                tuige_ctx_dict,
+                                tuige_setup or "unclassified",
+                            )
+            except Exception as exc:
+                logger.debug("Tuige setup/grade skipped: %s", exc)
+        if tuige_setup:
+            init_agent_state["tuige_setup"] = tuige_setup
+            if progress_logger:
+                progress_logger.log_detail(f"Tuige setup: {tuige_setup}")
+        if tuige_position_grade:
+            init_agent_state["tuige_position_grade"] = tuige_position_grade
+            if progress_logger:
+                progress_logger.log_detail(f"Tuige position_grade: {tuige_position_grade}")
+        if tuige_ctx_dict:
+            from tradingagents.tuige.position_grade import format_tuige_summary
+
+            init_agent_state["tuige_context_summary"] = format_tuige_summary(tuige_ctx_dict)
+
         args = self.propagator.get_graph_args()
 
         # Inject thread_id so same ticker+date resumes, different date starts fresh.
@@ -443,7 +541,6 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
-        progress_logger = None
         if self.debug:
             trace = []
             for chunk in self.graph.stream(init_agent_state, **args):
@@ -458,13 +555,29 @@ class TradingAgentsGraph:
             for chunk in trace:
                 final_state.update(chunk)
         elif progress_logging_enabled(self.config):
-            progress_logger = GraphProgressLogger(company_name, str(trade_date))
-            progress_logger.log_start(progress_extra or None)
+            if progress_logger is None:
+                progress_logger = GraphProgressLogger(company_name, str(trade_date))
+                progress_logger.log_start()
             final_state = progress_logger.run_stream(
                 self.graph, init_agent_state, args
             )
         else:
             final_state = self.graph.invoke(init_agent_state, **args)
+
+        grade = (final_state.get("tuige_position_grade") or tuige_position_grade or "").strip()
+        setup = (final_state.get("tuige_setup") or tuige_setup or "").strip()
+        if grade and final_state.get("final_trade_decision"):
+            from tradingagents.tuige.position_grade import enrich_final_trade_decision
+
+            summary = (final_state.get("tuige_context_summary") or "").strip()
+            enriched = enrich_final_trade_decision(
+                final_state["final_trade_decision"],
+                position_grade=grade,
+                tuige_setup=setup,
+                tuige_summary=summary,
+            )
+            if enriched != final_state["final_trade_decision"]:
+                final_state["final_trade_decision"] = enriched
 
         # Store current state for reflection.
         self.curr_state = final_state

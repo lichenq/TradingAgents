@@ -35,6 +35,14 @@ class CnPrefetchNewsTests(unittest.TestCase):
                 return_value="events ok",
             ),
             patch(
+                "tradingagents.dataflows.cn_technical.fetch_and_cache_cn_technical",
+                return_value=("ok · MACD_DIF -0.20", True),
+            ),
+            patch(
+                "tradingagents.dataflows.a_share._build_a_share_ohlcv_block",
+                return_value="time,open,high,low,close,volume,pctChg\n2026-07-03,1,2,3,4,5,6",
+            ),
+            patch(
                 "tradingagents.dataflows.interface.route_to_vendor",
                 side_effect=fake_route,
             ),

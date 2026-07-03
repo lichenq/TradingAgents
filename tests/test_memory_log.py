@@ -662,6 +662,7 @@ class TestDeferredReflection:
             "FAILURE_MODE: timing\nToo early."
         )
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        mock_graph.config = {"max_pending_resolve_per_run": 10}
         mock_graph.memory_log = log
         mock_graph.reflector = mock_reflector
         mock_graph._resolve_benchmark = MagicMock(return_value="SPY")
@@ -677,6 +678,7 @@ class TestDeferredReflection:
         mock_reflector = MagicMock()
         mock_reflector.reflect_on_final_decision.return_value = "Momentum confirmed."
         mock_graph = MagicMock(spec=TradingAgentsGraph)
+        mock_graph.config = {"max_pending_resolve_per_run": 10}
         mock_graph.memory_log = log
         mock_graph.reflector = mock_reflector
         mock_graph._fetch_returns = MagicMock(return_value=(0.05, 0.02, 5))

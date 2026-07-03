@@ -282,10 +282,14 @@ def curate_final_recommendations(
         chunk = _truncate_report(report_text, per_limit)
         budget_left -= len(chunk)
         stage2_rating = item.get("rating") or "Hold"
+        setup_line = ""
+        if item.get("tuige_setup"):
+            setup_line = f"- Tuige setup: {item.get('tuige_setup')}\n"
         report_blocks.append(
             f"### {name} ({code6})\n"
             f"- Stage-1 quant score: {item.get('score')}\n"
             f"- Stage-2 headline rating: {stage2_rating}\n"
+            f"{setup_line}"
             f"- Technical reason: {item.get('reason', '')}\n\n"
             f"{chunk}\n"
         )

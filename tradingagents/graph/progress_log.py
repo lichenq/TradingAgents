@@ -169,7 +169,15 @@ class GraphProgressLogger:
         self._log(f"▶ 开始分析 {self.ticker} · 交易日 {self.trade_date}")
         if extra_lines:
             for line in extra_lines:
-                self._log(f"  · {line}")
+                self.log_detail(line)
+
+    def log_phase(self, msg: str) -> None:
+        self._current_phase = msg
+        self._activity_kind = "llm"
+        self._log(f"▶ {msg}")
+
+    def log_detail(self, msg: str) -> None:
+        self._log(f"  · {msg}")
 
     def _on_node_update(self, node_name: str, update: Optional[Dict[str, Any]]) -> None:
         if not update:

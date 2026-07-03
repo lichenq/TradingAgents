@@ -108,6 +108,14 @@ def create_portfolio_manager(llm):
         )
 
         gatekeeping = _build_gatekeeping_mandate()
+        tuige_grade = (state.get("tuige_position_grade") or "").strip()
+        tuige_setup = (state.get("tuige_setup") or "").strip()
+        position_mandate = ""
+        if tuige_grade:
+            from tradingagents.tuige.position_grade import format_position_grade_mandate
+
+            position_mandate = format_position_grade_mandate(tuige_grade, tuige_setup)
+
         prompt = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}
@@ -117,7 +125,7 @@ def create_portfolio_manager(llm):
 {get_rating_scale_guidance()}
 
 ---
-
+{position_mandate}
 {audit_kpi}
 
 ---
@@ -135,7 +143,8 @@ def create_portfolio_manager(llm):
 ---
 
 Be decisive and ground every conclusion in specific evidence from the analysts. Critically evaluate their fact-credibility and logic chain reliability.
-Populate evidence_citations with 2-5 items quoting verified facts or named analyst findings; never invent PE/PB/price.{get_language_instruction()}"""
+Populate evidence_citations with 2-5 items quoting verified facts or named analyst findings; never invent PE/PB/price.
+When a Tuige position_grade mandate is provided above, set position_grade to that exact value and reflect it in executive_summary sizing.{get_language_instruction()}"""
 
         prompt = append_verified_market_facts(prompt, state)
         final_trade_decision = invoke_structured_or_freetext(
@@ -145,6 +154,16 @@ Populate evidence_citations with 2-5 items quoting verified facts or named analy
             render_pm_decision,
             "Portfolio Manager",
         )
+        if tuige_grade and "**Position Grade**" not in final_trade_decision:
+            from tradingagents.tuige.position_grade import enrich_final_trade_decision
+
+            summary = (state.get("tuige_context_summary") or "").strip()
+            final_trade_decision = enrich_final_trade_decision(
+                final_trade_decision,
+                position_grade=tuige_grade,
+                tuige_setup=tuige_setup,
+                tuige_summary=summary,
+            )
 
         new_risk_debate_state = {
             "judge_decision": final_trade_decision,

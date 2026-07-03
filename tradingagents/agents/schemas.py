@@ -247,6 +247,17 @@ class PortfolioDecision(BaseModel):
             "Do not invent PE/PB/price."
         ),
     )
+    position_grade: Optional[str] = Field(
+        default=None,
+        description=(
+            "Tuige position grade: standard / light / defensive / no_trade. "
+            "Must match the pre-computed mandate in the prompt; use for sizing."
+        ),
+    )
+    tuige_setup: Optional[str] = Field(
+        default=None,
+        description="Tuige setup module for this ticker (e.g. trend-setups).",
+    )
 
 
 def render_pm_decision(decision: PortfolioDecision) -> str:
@@ -268,6 +279,10 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
     if decision.time_horizon:
         parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+    if decision.tuige_setup:
+        parts.extend(["", f"**Tuige Setup**: {decision.tuige_setup}"])
+    if decision.position_grade:
+        parts.extend(["", f"**Position Grade**: {decision.position_grade}"])
     if decision.evidence_citations:
         parts.extend(["", "**Evidence Citations**:"])
         for cite in decision.evidence_citations:

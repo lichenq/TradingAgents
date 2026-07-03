@@ -79,6 +79,8 @@ def run_recommendation_pipeline(
         env.pop(key, None)
     env["NO_PROXY"] = "*"
     env["no_proxy"] = "*"
+    env.setdefault("TRADINGAGENTS_TUIGE_ENABLED", "1")
+    env.setdefault("TRADINGAGENTS_MARKET", "cn")
 
     logger.info(f"Executing: {' '.join(cmd)}")
     try:
@@ -110,6 +112,15 @@ def extract_price_and_stop_loss(trader_plan: str, decision_text: str, current_pr
             sizing = sizing_match.group(1).strip()
             
     # 2. Parse narrative text from final Portfolio Manager Decision (Chinese)
+    if sizing == "待定" or sizing == "10% - 15% 试探仓":
+        m_tuige = re.search(
+            r"\*\*Position Sizing \(Tuige\)\*\*:\s*([^\n]+)",
+            decision_text,
+            re.IGNORECASE,
+        )
+        if m_tuige:
+            sizing = m_tuige.group(1).strip()
+
     if entry_price == "待定" and decision_text:
         # Search patterns: "入场价参考现价80.74元附近" or "72-75元且缩量企稳" or "回到40-50×"
         m = re.search(r"(?:入场价|建议买入|建议入场|买入价|挂单价|价格回落至)[^\d\w]*?([\d\.-]+)\s*元?", decision_text)
@@ -265,6 +276,16 @@ def main() -> int:
         return 1
 
     # Step 2: Extraction and Compilation
+    tuige_context: Dict[str, Any] = {}
+    rec_json_path = Path(results_dir) / "recommendations" / trade_date / "recommended_stocks.json"
+    if rec_json_path.is_file():
+        try:
+            with open(rec_json_path, encoding="utf-8") as f:
+                rec_payload = json.load(f)
+            tuige_context = rec_payload.get("tuige_context") or {}
+        except Exception as exc:
+            logger.warning("Could not load tuige_context from %s: %s", rec_json_path, exc)
+
     bulletin_data = []
     for r in final_selected:
         ticker = r["ticker"]
@@ -273,6 +294,12 @@ def main() -> int:
         current_price = float(r.get("price") or 0.0)
         score = float(r.get("score") or 0.0)
         reason = r.get("reason") or ""
+        metrics = r.get("metrics") or {}
+        if isinstance(metrics, str):
+            try:
+                metrics = json.loads(metrics)
+            except json.JSONDecodeError:
+                metrics = {}
         
         trader_plan, pm_decision = fetch_report_data(ticker, trade_date, db_path)
         entry_price, stop_loss, sizing = extract_price_and_stop_loss(trader_plan, pm_decision, current_price)
@@ -297,7 +324,9 @@ def main() -> int:
             "stop_loss": stop_loss,
             "sizing": sizing,
             "triggers": trigger_narrative,
-            "technical_reason": reason
+            "technical_reason": reason,
+            "tuige_setup": metrics.get("tuige_setup"),
+            "position_grade": metrics.get("position_grade"),
         })
 
     # Step 3: Print and Save Bulletin Report
@@ -313,6 +342,7 @@ def main() -> int:
             "trade_date": trade_date,
             "is_fallback_warning": has_warning,
             "strategy": args.strategy,
+            "tuige_context": tuige_context,
             "selections": bulletin_data
         }, f, ensure_ascii=False, indent=2)
 
@@ -328,6 +358,11 @@ def main() -> int:
             f"- **数据更新时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             "",
         ]
+        if tuige_context.get("enabled"):
+            from tradingagents.tuige.position_grade import format_tuige_summary
+
+            md_lines.append(f"- **Tuige 市况**: {format_tuige_summary(tuige_context)}")
+            md_lines.append("")
         
         if has_warning:
             md_lines.extend([

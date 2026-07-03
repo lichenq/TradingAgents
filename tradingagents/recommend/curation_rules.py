@@ -20,6 +20,8 @@ class CurationContext:
     cautious_sectors: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     downgrade_buy: bool = False
     strategy: str = ""
+    tuige_context: Optional[Dict[str, Any]] = None
+    tuige_strict: bool = False
 
 
 def _force_curation_enabled() -> bool:
@@ -41,16 +43,20 @@ def build_curation_context(
     config: Dict[str, Any],
     trade_date: str,
     strategy: str,
+    tuige_context: Optional[Dict[str, Any]] = None,
 ) -> CurationContext:
     results_dir = str(config.get("results_dir") or "results")
     cautious: Dict[str, Dict[str, Any]] = {}
     downgrade_buy = False
+    tuige_strict = False
     try:
         from tradingagents.dataflows.audit_feedback_gates import build_cautious_sectors
         from tradingagents.dataflows.rating_calibration import should_downgrade_buy
+        from tradingagents.tuige.context import tuige_strict as _tuige_strict
 
         cautious = build_cautious_sectors(results_dir)
         downgrade_buy = should_downgrade_buy(results_dir)
+        tuige_strict = _tuige_strict()
     except Exception:
         pass
     return CurationContext(
@@ -60,6 +66,8 @@ def build_curation_context(
         cautious_sectors=cautious,
         downgrade_buy=downgrade_buy,
         strategy=strategy,
+        tuige_context=tuige_context,
+        tuige_strict=tuige_strict,
     )
 
 
@@ -93,6 +101,17 @@ def evaluate_hard_rule(item: Dict[str, Any], ctx: CurationContext) -> Tuple[bool
 
     if rating not in FINAL_ACTIONABLE_RATINGS:
         return False, f"rating={rating} not in final actionable set"
+
+    if ctx.tuige_context:
+        from tradingagents.tuige.stage3_gates import evaluate_tuige_setup_gate
+
+        ok, reason = evaluate_tuige_setup_gate(
+            item,
+            ctx.tuige_context,
+            strict=ctx.tuige_strict,
+        )
+        if not ok:
+            return False, reason
 
     return True, "ok"
 

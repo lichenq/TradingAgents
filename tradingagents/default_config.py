@@ -72,6 +72,8 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_MEMORY_BACKEND":      "memory_log_backend",
     "TRADINGAGENTS_POSITION_CONTEXT":    "position_context",
     "TRADINGAGENTS_RISK_REGIME":         "position_context_regime",
+    "TRADINGAGENTS_TUIGE_ENABLED":       "tuige_enabled",
+    "TRADINGAGENTS_TUIGE_STRICT":        "tuige_strict",
 }
 
 # Optional numeric overrides (defaults are None in DEFAULT_CONFIG).
@@ -205,12 +207,18 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     # Decision framing: "retail" (individual investor — default), "empty" (flat, no position), or "held" (already own the ticker)
     "position_context": "retail",
     "position_context_regime": "auto",
+    # Tuige shortline integration (CN): reminder mode by default (tuige_strict=False)
+    "tuige_enabled": True,
+    "tuige_strict": False,
     # User holdings (optional; injected into verified_market_facts when set)
     "position_cost": None,
     "position_shares": None,
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
+    # Cap pending memory-log replays per run so a new analysis is not blocked
+    # by many historical LLM reflection calls (each needs fetch + LLM).
+    "max_pending_resolve_per_run": 2,
     "max_recur_limit": 100,
     # >1 runs market/sentiment/news/fundamentals in parallel (LangGraph fan-out).
     # Use 1 until parallel join/debate reducers are fully battle-tested.

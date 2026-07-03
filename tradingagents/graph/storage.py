@@ -170,8 +170,12 @@ def save_recommendation(
     try:
         cursor = conn.cursor()
         
-        # Serialize dict structures
-        metrics_json = json.dumps(rec.get("metrics") or {}, ensure_ascii=False)
+        # Serialize dict structures (include Tuige fields for daily bulletin / SQLite)
+        metrics = dict(rec.get("metrics") or {})
+        for key in ("tuige_setup", "tuige_setup_rationale", "position_grade"):
+            if rec.get(key) is not None:
+                metrics[key] = rec.get(key)
+        metrics_json = json.dumps(metrics, ensure_ascii=False)
         report_paths_json = json.dumps(rec.get("report_paths") or {}, ensure_ascii=False)
         created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         

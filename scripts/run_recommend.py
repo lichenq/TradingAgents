@@ -534,6 +534,8 @@ def run_multi_agent_graph(
     logger.info(f"[recommend]   · 开始深度研判 {name}({code6}) ...")
     try:
         local_config = parallel_config.copy()
+        local_config["tuige_setup"] = item.get("tuige_setup") or ""
+        local_config["tuige_position_grade"] = item.get("position_grade") or ""
         bundle = report_bundle_dir(local_config["results_dir"], code, trade_date)
         bundle.mkdir(parents=True, exist_ok=True)
         local_config["memory_log_path"] = str(bundle / "trading_memory.md")
@@ -729,26 +731,8 @@ def main() -> int:
     except Exception as exc:
         prog.step(f"P1 audit 门禁跳过: {exc}")
 
-    from tradingagents.recommend.regime_stage1 import detect_book_regime, regime_stage1_params
-
-    book_regime = detect_book_regime(trade_date)
-    regime_params = regime_stage1_params(book_regime)
-    prog.step(f"市况 regime={book_regime}: {regime_params.note}")
-    if args.strategy in regime_params.blocked_strategies and not args.force:
-        logger.error(
-            f"策略 {args.strategy} 在 {book_regime} 下被禁用。使用 --force 强制执行。"
-        )
-        return 2
-    if args.validate_top > regime_params.validate_top_cap:
-        prog.step(
-            f"validate_top {args.validate_top} → {regime_params.validate_top_cap} (regime)"
-        )
-        args.validate_top = regime_params.validate_top_cap
-    if regime_params.min_volume_multiplier != 1.0:
-        args.min_volume_amount *= regime_params.min_volume_multiplier
-        prog.step(
-            f"min_volume_amount ×{regime_params.min_volume_multiplier:.1f} (regime)"
-        )
+    tuige_ctx = None
+    book_regime = "rotation"
 
     audit_max_pe: Optional[float] = None
     try:
@@ -791,6 +775,29 @@ def main() -> int:
 
         meta_total = (quotes_data.get("meta") or {}).get("total")
         prog.step(f"全市场原始行情数={len(quotes_list)}" + (f", meta.total={meta_total}" if meta_total else ""))
+
+        from tradingagents.tuige.context import build_tuige_context, tuige_strict
+        from tradingagents.recommend.regime_stage1 import apply_stage1_params, build_regime_stage1_from_context
+
+        from tradingagents.tuige.market_inputs import fetch_tuige_market_inputs
+
+        market = fetch_tuige_market_inputs(trade_date, quotes=quotes_list)
+        tuige_ctx = build_tuige_context(
+            trade_date,
+            quotes=quotes_list,
+            index_payload=market.index_payload,
+            industry_flows=market.industry_flows,
+        )
+        regime_params = build_regime_stage1_from_context(tuige_ctx)
+        book_regime = tuige_ctx.effective_regime if tuige_ctx.enabled else "rotation"
+        if not apply_stage1_params(
+            args,
+            regime_params,
+            strict=tuige_strict(),
+            prog=prog,
+            logger=logger,
+        ):
+            return 2
 
         board_codes = set()
         if args.board:
@@ -1040,6 +1047,21 @@ def main() -> int:
                 screen_result = screen_em_fomo_exit(df, sentiment_by_code.get(code6, {}))
 
             if screen_result:
+                from tradingagents.tuige.setup_classifier import classify_setup
+                from tradingagents.tuige.stage3_gates import derive_position_grade
+
+                setup_cls = classify_setup(
+                    df,
+                    code6=code6,
+                    strategy_hint=args.strategy,
+                )
+                screen_result["tuige_setup"] = setup_cls.setup
+                screen_result["tuige_setup_rationale"] = setup_cls.rationale
+                if tuige_ctx is not None and tuige_ctx.enabled:
+                    screen_result["position_grade"] = derive_position_grade(
+                        tuige_ctx.to_dict(),
+                        setup_cls.setup,
+                    )
                 screen_result["code"] = q["code"]
                 screen_result["name"] = q["name"]
                 screen_result["price"] = q["price"]
@@ -1184,7 +1206,12 @@ def main() -> int:
     from tradingagents.recommend.portfolio_curator import _legacy_filter
 
     skip_curation = should_skip_curation(args.skip_curation)
-    curation_ctx = build_curation_context(config, trade_date, args.strategy)
+    curation_ctx = build_curation_context(
+        config,
+        trade_date,
+        args.strategy,
+        tuige_context=tuige_ctx.to_dict() if tuige_ctx and tuige_ctx.enabled else None,
+    )
     shadow_recommendations = _legacy_filter(validated_results)
     curation_meta: Dict[str, Any] = {}
     recommended_stocks: List[Dict[str, Any]] = []
@@ -1201,6 +1228,8 @@ def main() -> int:
             curation_ctx=curation_ctx,
         )
         curation_meta["book_regime"] = book_regime
+        if tuige_ctx is not None and tuige_ctx.enabled:
+            curation_meta["tuige_context"] = tuige_ctx.to_dict()
         curation_meta["shadow_legacy_count"] = len(shadow_recommendations)
         if curation_meta.get("method") == "llm":
             prog.step(
@@ -1227,6 +1256,7 @@ def main() -> int:
             "trade_date": trade_date,
             "strategy": args.strategy,
             "book_regime": book_regime,
+            "tuige_context": tuige_ctx.to_dict() if tuige_ctx and tuige_ctx.enabled else None,
             "curation": curation_meta,
             "shadow_recommendations": [
                 {
@@ -1269,6 +1299,9 @@ def main() -> int:
                     "skipped_deep_analysis": r.get("skipped_deep_analysis", False),
                     "curation_reviewed": r.get("curation_reviewed", False),
                     "curation_evidence": r.get("curation_evidence", ""),
+                    "tuige_setup": r.get("tuige_setup"),
+                    "tuige_setup_rationale": r.get("tuige_setup_rationale"),
+                    "position_grade": r.get("position_grade"),
                 }
                 for r in recommended_stocks
             ],
@@ -1298,11 +1331,23 @@ def main() -> int:
                 f"- **筛选量化策略**: `{args.strategy}` (共初筛 `{len(shortlist)}` 只股票，通过红线过滤 `{len(valid_shortlist)}` 只)",
                 f"- **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                 "",
+            ]
+            if tuige_ctx is not None and tuige_ctx.enabled:
+                from tradingagents.tuige.position_grade import format_tuige_summary
+
+                md_lines.extend([
+                    "##  Tuige 市况摘要",
+                    "",
+                    f"- {format_tuige_summary(tuige_ctx.to_dict())}",
+                    f"- 有效环境: `{tuige_ctx.effective_regime}` | 换仓窗口: `{tuige_ctx.rebalance_window}`",
+                    "",
+                ])
+            md_lines.extend([
                 "##  股票池精选结果摘要 (Shortlist Summary)",
                 "",
                 "| 股票代码 | 股票名称 | 量化分值 | 最新现价 | 智能体决策级 | 核心推荐驱动力 |",
                 "|---|---|---|---|---|---|",
-            ]
+            ])
 
             for r in recommended_stocks:
                 code6 = r["code"][-6:]
@@ -1325,6 +1370,7 @@ def main() -> int:
                     f"### {r['name']} ({code6}) — 智能体评级: **{r['rating']}**",
                     "",
                     f"- **初筛现价**: `{r['price']:.2f} 元` | **量化技术形态得分**: `{r['score']:.1f}`",
+                    f"- **Tuige 场景**: `{r.get('tuige_setup') or '—'}` | **仓位等级**: `{r.get('position_grade') or '—'}`",
                     f"- **技术筛理由**: {r['reason']}",
                     "",
                 ])

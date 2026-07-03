@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Dict, List
@@ -473,6 +474,7 @@ def _fetch_akshare_detailed_fundamentals(code6: str) -> str:
     """
     _patch_emweb_dns()
     try:
+        os.environ.setdefault("TQDM_DISABLE", "1")
         import akshare as ak
     except ImportError:
         return ""

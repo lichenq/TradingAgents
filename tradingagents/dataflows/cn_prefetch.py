@@ -114,6 +114,12 @@ def run_cn_prefetch(
         status = "ok" if block and "暂无" not in block else "empty"
         return "fund_flow", status
 
+    def task_technical() -> Tuple[str, str]:
+        from tradingagents.dataflows.cn_technical import fetch_and_cache_cn_technical
+
+        status, ok = fetch_and_cache_cn_technical(ticker, trade_date)
+        return "technical", status if ok else f"FAILED · {status}"
+
     jobs = [
         task_sector,
         task_valuation,
@@ -121,6 +127,7 @@ def run_cn_prefetch(
         task_xueqiu,
         task_events,
         task_kline,
+        task_technical,
         task_news,
         task_fund_flow,
     ]

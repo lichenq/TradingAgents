@@ -75,6 +75,18 @@ class AgentState(MessagesState):
         str,
         "Pre-fetched price/PE/PB (CN) injected before debate; agents must not invent valuation",
     ]
+    tuige_setup: Annotated[
+        str,
+        "Tuige per-ticker setup module (trend-setups, relay-setups, etc.)",
+    ]
+    tuige_position_grade: Annotated[
+        str,
+        "Pre-computed Tuige position grade for PM sizing discipline",
+    ]
+    tuige_context_summary: Annotated[
+        str,
+        "Compact Tuige market context summary for reports",
+    ]
     report_quality_notes: Annotated[
         str,
         "Pre-debate quality gate notes for low-quality analyst reports",

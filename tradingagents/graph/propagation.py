@@ -61,6 +61,9 @@ class Propagator:
             "sentiment_report": "",
             "news_report": "",
             "verified_market_facts": "",
+            "tuige_setup": "",
+            "tuige_position_grade": "",
+            "tuige_context_summary": "",
             "report_quality_notes": "",
         }
         if parallel_analysts:
