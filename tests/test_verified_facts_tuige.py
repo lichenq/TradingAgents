@@ -5,38 +5,65 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from tradingagents.agents.utils.verified_facts import append_verified_market_facts
+from tradingagents.agents.utils.verified_facts import append_verified_market_facts, resolve_tuige_context
+from tradingagents.tuige.context import TuigeContext
 
 
 class TestVerifiedFactsTuigeSetup(unittest.TestCase):
 
     @patch("tradingagents.agents.utils.verified_facts.tuige_enabled", return_value=True)
-    @patch("tradingagents.agents.utils.verified_facts.build_tuige_context")
-    @patch("tradingagents.agents.utils.verified_facts.detect_market_regime", return_value="rotation")
-    @patch("tradingagents.agents.utils.verified_facts.get_regime_prompt_instructions", return_value="REGIME")
-    def test_setup_block_injected(self, _regime_prompt, _detect, mock_ctx, _enabled):
-        mock_ctx.return_value.enabled = True
-        mock_ctx.return_value.base_regime = "rotation"
-        mock_ctx.return_value.effective_regime = "rotation"
-        mock_ctx.return_value.rebalance_window = "no"
-        mock_ctx.return_value.signal_hits = []
-        mock_ctx.return_value.allowed_setups = ["trend-setups"]
-        mock_ctx.return_value.blocked_setups = []
-        mock_ctx.return_value.position_cap = "light"
-        mock_ctx.return_value.rebalance_note = ""
-        mock_ctx.return_value.reminders = []
-        mock_ctx.return_value.tuige_setup = "trend-setups"
-        mock_ctx.return_value.tuige_setup_rationale = ""
-
+    def test_setup_block_injected(self, _enabled):
+        ctx_dict = TuigeContext(
+            enabled=True,
+            effective_regime="rotation",
+            allowed_setups=["trend-setups"],
+            tuige_setup="trend-setups",
+        ).to_dict()
         state = {
             "verified_market_facts": "PE: 20x",
             "company_of_interest": "600000",
             "trade_date": "2026-07-01",
             "tuige_setup": "trend-setups",
+            "tuige_context": ctx_dict,
         }
         out = append_verified_market_facts("BASE", state)
         self.assertIn("trend-setups", out)
         self.assertIn("Tuige 个股场景", out)
+        self.assertIn("rotation", out)
+
+    @patch("tradingagents.agents.utils.verified_facts.tuige_enabled", return_value=True)
+    def test_cached_tuige_context_used(self, _enabled):
+        ctx_dict = TuigeContext(
+            enabled=True,
+            effective_regime="rotation",
+            allowed_setups=["trend-setups"],
+        ).to_dict()
+        state = {
+            "verified_market_facts": "PE: 20x",
+            "tuige_context": ctx_dict,
+        }
+        ctx = resolve_tuige_context(state)
+        self.assertIsNotNone(ctx)
+        self.assertEqual(ctx.effective_regime, "rotation")
+
+    @patch("tradingagents.agents.utils.verified_facts.tuige_enabled", return_value=True)
+    @patch("tradingagents.agents.utils.verified_facts.build_tuige_context")
+    @patch("tradingagents.tuige.market_inputs.fetch_tuige_market_inputs")
+    def test_fallback_builds_with_market_inputs(self, mock_fetch, mock_build, _enabled):
+        mock_fetch.return_value.quotes = [{"code": "600000"}]
+        mock_fetch.return_value.index_payload = {"data": []}
+        mock_fetch.return_value.industry_flows = []
+        mock_build.return_value = TuigeContext(enabled=True, effective_regime="defensive")
+
+        state = {
+            "verified_market_facts": "PE: 20x",
+            "trade_date": "2026-07-01",
+            "company_of_interest": "600000",
+        }
+        ctx = resolve_tuige_context(state)
+        self.assertEqual(ctx.effective_regime, "defensive")
+        mock_fetch.assert_called_once()
+        mock_build.assert_called_once()
 
 
 if __name__ == "__main__":

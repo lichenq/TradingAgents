@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from tradingagents.dataflows.config import get_config
-from tradingagents.tuige.prompt_blocks import format_tuige_prompt_block, get_regime_prompt_instructions
 from tradingagents.tuige.rebalance_detector import RebalanceAssessment, detect_rebalance_window
 from tradingagents.tuige.regime import (
     allowed_setups,
@@ -109,11 +108,37 @@ class TuigeContext:
             "tuige_setup_rationale": self.tuige_setup_rationale,
         }
 
-    def prompt_block(self) -> str:
-        return format_tuige_prompt_block(self)
-
-    def regime_prompt(self) -> str:
-        return get_regime_prompt_instructions(self.effective_regime)
+    @classmethod
+    def from_dict(cls, data: dict) -> TuigeContext:
+        stage1_raw = data.get("stage1_advisory") or {}
+        stage1 = None
+        if stage1_raw:
+            stage1 = Stage1Advisory(
+                regime=str(data.get("effective_regime") or "rotation"),
+                validate_top_cap=int(stage1_raw.get("validate_top_cap", 5)),
+                blocked_strategies=frozenset(stage1_raw.get("blocked_strategies") or []),
+                min_volume_multiplier=float(stage1_raw.get("min_volume_multiplier", 1.0)),
+                note=str(stage1_raw.get("note") or ""),
+            )
+        return cls(
+            enabled=bool(data.get("enabled")),
+            trade_date=str(data.get("trade_date") or ""),
+            ticker=data.get("ticker"),
+            base_regime=str(data.get("base_regime") or "rotation"),
+            effective_regime=str(data.get("effective_regime") or "rotation"),
+            base_rationale=str(data.get("base_rationale") or ""),
+            rebalance_window=str(data.get("rebalance_window") or "no"),
+            signal_hits=list(data.get("signal_hits") or []),
+            rebalance_note=str(data.get("rebalance_note") or ""),
+            allowed_setups=list(data.get("allowed_setups") or []),
+            blocked_setups=list(data.get("blocked_setups") or []),
+            position_cap=str(data.get("position_cap") or "light"),
+            stage1=stage1,
+            reminders=list(data.get("reminders") or []),
+            strict=bool(data.get("strict")),
+            tuige_setup=data.get("tuige_setup"),
+            tuige_setup_rationale=str(data.get("tuige_setup_rationale") or ""),
+        )
 
 
 def build_tuige_context(
@@ -184,14 +209,3 @@ def build_tuige_context(
     )
     return ctx
 
-
-def fetch_market_inputs_for_tuige(trade_date: str) -> tuple[Optional[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
-    """Best-effort index + industry fund flow for book-level Tuige context."""
-    try:
-        from tradingagents.tuige.market_inputs import fetch_tuige_market_inputs
-
-        payload = fetch_tuige_market_inputs(trade_date, include_quotes=False)
-        return payload.index_payload, payload.industry_flows
-    except Exception as exc:
-        logger.warning("Tuige market fetch skipped: %s", exc)
-        return None, None

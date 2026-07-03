@@ -65,10 +65,3 @@ def build_instrument_context(ticker: str, asset_type: str = "stock") -> str:
         + get_position_assumption_instruction()
     )
 
-def create_msg_delete(thread_key: str | None = None):
-    from tradingagents.agents.utils.analyst_threads import create_analyst_msg_clear
-
-    return create_analyst_msg_clear(thread_key)
-
-
-        

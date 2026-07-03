@@ -14,7 +14,6 @@ from tradingagents.market import normalize_a_share_code
 FILL_DAYS_DEFAULT = 10
 FILL_DAYS_V2 = 15
 MIN_DISCOUNT_PCT = 5.0
-MIN_DISCOUNT_SHALLOW_PCT = 3.0
 FILL_CONFIRM_RATIO = 0.98
 ATR_STOP_MULT_V2 = 0.75
 
@@ -317,7 +316,7 @@ def backtest_tiered(
             continue
         sharp = signal_sharp_drop(bars, i)
         shallow = limit_price("hybrid_v2_shallow", bars, i) if (not adaptive or sharp) else None
-        deep = limit_price("hybrid_v2_deep", bars, i) or limit_price("hybrid", bars, i)
+        deep = limit_price("hybrid_v2_deep", bars, i)
         if shallow is None and deep is None:
             continue
         st.signals += 1
@@ -521,7 +520,7 @@ def suggest_entry_levels(ticker: str, trade_date: str) -> str:
     sharp = signal_sharp_drop(bars, i)
     entry_sig = signal_hybrid_entry(bars, i)
 
-    deep = limit_price("hybrid_v2_deep", bars, i) or limit_price("hybrid", bars, i)
+    deep = limit_price("hybrid_v2_deep", bars, i)
     shallow = limit_price("hybrid_v2_shallow", bars, i) if sharp else None
     first = shallow if shallow else deep
     second = deep if sharp and deep and deep < (first or price) else None

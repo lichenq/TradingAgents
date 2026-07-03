@@ -64,6 +64,7 @@ class Propagator:
             "tuige_setup": "",
             "tuige_position_grade": "",
             "tuige_context_summary": "",
+            "tuige_context": {},
             "scheduled_event_alerts": [],
             "report_quality_notes": "",
         }

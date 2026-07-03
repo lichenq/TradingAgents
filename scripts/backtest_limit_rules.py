@@ -15,22 +15,15 @@ if str(project_root) not in sys.path:
 from tradingagents.dataflows.limit_entry_rules import (  # noqa: E402
     RULE_IDS,
     SIGNAL_MODES,
+    aggregate_compare,
     run_backtest_for_ticker,
+    run_compare_for_ticker,
 )
 
 DEFAULT_TICKERS = "601138,002475,002241,300433,002600,603296"
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Backtest limit entry rules")
-    parser.add_argument("--tickers", default=DEFAULT_TICKERS, help="Comma-separated 6-digit codes")
-    parser.add_argument("--start", default="2024-01-01")
-    parser.add_argument("--end", default="2026-07-03")
-    parser.add_argument("--signal", choices=SIGNAL_MODES, default="macd_bear")
-    parser.add_argument("--json", action="store_true", dest="output_json")
-    args = parser.parse_args()
-
-    tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
+def _run_grid(args: argparse.Namespace, tickers: list[str]) -> int:
     all_rows = []
     for ticker in tickers:
         try:
@@ -59,13 +52,69 @@ def main() -> int:
             f"{row['ret_20d_pct'] if row['ret_20d_pct'] is not None else 'n/a':>7} "
             f"{row['stop_hit_pct'] if row['stop_hit_pct'] is not None else 'n/a':>6}"
         )
-
-    hybrid = [r for r in all_rows if r["rule"] == "hybrid" and r.get("signals", 0) > 0]
-    if hybrid:
-        avg_r20 = sum(r["ret_20d_pct"] or 0 for r in hybrid) / len(hybrid)
-        avg_fill = sum(r["fill_rate_pct"] for r in hybrid) / len(hybrid)
-        print(f"\nhybrid aggregate: avg fill_rate={avg_fill:.1f}% avg ret_20d={avg_r20:.2f}% (n={len(hybrid)} tickers)")
     return 0
+
+
+def _run_compare(args: argparse.Namespace, tickers: list[str]) -> int:
+    all_rows = []
+    for ticker in tickers:
+        try:
+            all_rows.extend(run_compare_for_ticker(ticker, args.start, args.end))
+        except Exception as exc:
+            print(f"[WARN] {ticker}: {exc}", file=sys.stderr)
+
+    agg = aggregate_compare(all_rows)
+    if args.output_json:
+        print(json.dumps({"rows": all_rows, "aggregate": agg}, ensure_ascii=False, indent=2))
+        return 0 if all_rows else 1
+
+    print(f"Hybrid compare · signal=hybrid_entry · {args.start} → {args.end}\n")
+    hdr = f"{'ticker':<8} {'rule':<30} {'sig':>5} {'fill%':>6} {'win20%':>7} {'r20':>7} {'stop%':>6}"
+    print(hdr)
+    print("-" * len(hdr))
+    for row in all_rows:
+        print(
+            f"{row['ticker']:<8} {row['rule']:<30} {row['signals']:>5} "
+            f"{row['fill_rate_pct']:>6.1f} "
+            f"{row['win_rate_20d_pct'] if row['win_rate_20d_pct'] is not None else 'n/a':>7} "
+            f"{row['ret_20d_pct'] if row['ret_20d_pct'] is not None else 'n/a':>7} "
+            f"{row['stop_hit_pct'] if row['stop_hit_pct'] is not None else 'n/a':>6}"
+        )
+
+    print("\nAggregate (score=0.35×fill+0.35×win+0.30×ret×10):")
+    ahdr = f"{'rule':<30} {'fill%':>6} {'win20%':>7} {'r20':>7} {'stop%':>6} {'score':>6}"
+    print(ahdr)
+    print("-" * len(ahdr))
+    for v in agg["variants"]:
+        print(
+            f"{v['rule']:<30} {v['avg_fill_rate_pct']:>6.1f} "
+            f"{v['avg_win_rate_20d_pct']:>7.1f} "
+            f"{v['avg_ret_20d_pct']:>7.2f} "
+            f"{v['avg_stop_hit_pct']:>6.1f} {v['score']:>6.1f}"
+        )
+    best = agg["variants"][0] if agg["variants"] else None
+    if best:
+        print(
+            f"\nBest composite score: {best['rule']} "
+            f"(fill={best['avg_fill_rate_pct']}%, win={best['avg_win_rate_20d_pct']}%, r20={best['avg_ret_20d_pct']}%)"
+        )
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Backtest limit entry rules")
+    parser.add_argument("--mode", choices=("grid", "compare"), default="grid")
+    parser.add_argument("--tickers", default=DEFAULT_TICKERS, help="Comma-separated 6-digit codes")
+    parser.add_argument("--start", default="2024-01-01")
+    parser.add_argument("--end", default="2026-07-03")
+    parser.add_argument("--signal", choices=SIGNAL_MODES, default="macd_bear")
+    parser.add_argument("--json", action="store_true", dest="output_json")
+    args = parser.parse_args()
+
+    tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
+    if args.mode == "compare":
+        return _run_compare(args, tickers)
+    return _run_grid(args, tickers)
 
 
 if __name__ == "__main__":

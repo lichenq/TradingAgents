@@ -172,7 +172,6 @@ def apply_market_profile(config: dict) -> dict:
 
 
 DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
-    "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": _default_storage_dir("logs", env_var="TRADINGAGENTS_RESULTS_DIR"),
     "data_cache_dir": _default_storage_dir("cache", env_var="TRADINGAGENTS_CACHE_DIR"),
     "memory_log_path": _default_memory_log_path(),

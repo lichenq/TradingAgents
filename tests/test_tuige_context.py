@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from tradingagents.tuige.context import build_tuige_context
+from tradingagents.tuige.context import TuigeContext, build_tuige_context
 from tradingagents.tuige.rebalance_detector import detect_rebalance_window
 from tradingagents.tuige.regime import apply_rebalance_modifier, detect_base_regime
 from tradingagents.tuige.snapshot import MarketSnapshot, snapshot_from_quotes
@@ -74,6 +74,19 @@ class TestTuigeRebalance(unittest.TestCase):
         self.assertTrue(d["enabled"])
         self.assertIn("effective_regime", d)
         self.assertIn("rebalance_window", d)
+
+    def test_from_dict_roundtrip(self):
+        ctx = TuigeContext(
+            enabled=True,
+            trade_date="2026-07-01",
+            effective_regime="rotation",
+            rebalance_window="yes",
+            allowed_setups=["trend-setups"],
+            stage1=stage1_advisory_for_regime("rotation", "yes"),
+        )
+        restored = TuigeContext.from_dict(ctx.to_dict())
+        self.assertEqual(restored.effective_regime, "rotation")
+        self.assertEqual(restored.rebalance_window, "yes")
 
 
 if __name__ == "__main__":

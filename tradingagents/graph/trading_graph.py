@@ -514,40 +514,36 @@ class TradingAgentsGraph:
         tuige_setup = (self.config.get("tuige_setup") or "").strip()
         tuige_ctx_dict: Optional[Dict[str, Any]] = None
         tuige_position_grade = (self.config.get("tuige_position_grade") or "").strip()
-        if not tuige_setup or not tuige_position_grade:
-            try:
-                from tradingagents.tuige.context import build_tuige_context, tuige_enabled
-                from tradingagents.tuige.position_grade import (
-                    derive_position_grade,
-                    format_tuige_summary,
+        try:
+            from tradingagents.tuige.context import build_tuige_context, tuige_enabled
+            from tradingagents.tuige.position_grade import derive_position_grade
+            from tradingagents.tuige.setup_classifier import classify_setup_from_code
+
+            if tuige_enabled() and cn_uses_a_share_skill(company_name, self.config):
+                if not tuige_setup:
+                    cls = classify_setup_from_code(company_name, str(trade_date))
+                    if cls and cls.setup != "unclassified":
+                        tuige_setup = cls.setup
+                from tradingagents.tuige.market_inputs import fetch_tuige_market_inputs
+
+                market = fetch_tuige_market_inputs(str(trade_date))
+                ctx = build_tuige_context(
+                    str(trade_date),
+                    ticker=company_name,
+                    quotes=market.quotes,
+                    index_payload=market.index_payload,
+                    industry_flows=market.industry_flows,
+                    tuige_setup=tuige_setup or None,
                 )
-                from tradingagents.tuige.setup_classifier import classify_setup_from_code
-
-                if tuige_enabled() and cn_uses_a_share_skill(company_name, self.config):
-                    if not tuige_setup:
-                        cls = classify_setup_from_code(company_name, str(trade_date))
-                        if cls and cls.setup != "unclassified":
-                            tuige_setup = cls.setup
-                    from tradingagents.tuige.market_inputs import fetch_tuige_market_inputs
-
-                    market = fetch_tuige_market_inputs(str(trade_date))
-                    ctx = build_tuige_context(
-                        str(trade_date),
-                        ticker=company_name,
-                        quotes=market.quotes,
-                        index_payload=market.index_payload,
-                        industry_flows=market.industry_flows,
-                        tuige_setup=tuige_setup or None,
-                    )
-                    if ctx.enabled:
-                        tuige_ctx_dict = ctx.to_dict()
-                        if not tuige_position_grade:
-                            tuige_position_grade = derive_position_grade(
-                                tuige_ctx_dict,
-                                tuige_setup or "unclassified",
-                            )
-            except Exception as exc:
-                logger.debug("Tuige setup/grade skipped: %s", exc)
+                if ctx.enabled:
+                    tuige_ctx_dict = ctx.to_dict()
+                    if not tuige_position_grade:
+                        tuige_position_grade = derive_position_grade(
+                            tuige_ctx_dict,
+                            tuige_setup or "unclassified",
+                        )
+        except Exception as exc:
+            logger.debug("Tuige setup/grade skipped: %s", exc)
         if tuige_setup:
             init_agent_state["tuige_setup"] = tuige_setup
             if progress_logger:
@@ -559,6 +555,7 @@ class TradingAgentsGraph:
         if tuige_ctx_dict:
             from tradingagents.tuige.position_grade import format_tuige_summary
 
+            init_agent_state["tuige_context"] = tuige_ctx_dict
             init_agent_state["tuige_context_summary"] = format_tuige_summary(tuige_ctx_dict)
 
         args = self.propagator.get_graph_args()

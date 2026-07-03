@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import FrozenSet, Tuple
 
-from tradingagents.tuige.regime import TUIGE_REGIMES
-
 
 @dataclass
 class Stage1Advisory:
@@ -88,9 +86,3 @@ def stage1_advisory_for_regime(
         )
 
     return Stage1Advisory(regime="rotation", note="未知 regime，按 rotation 提醒")
-
-
-def validate_regime(regime: str) -> str:
-    if regime in TUIGE_REGIMES:
-        return regime
-    return "rotation"

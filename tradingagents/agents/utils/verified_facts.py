@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from tradingagents.agents.utils.market_regime import detect_market_regime, get_regime_prompt_instructions
-from tradingagents.tuige.context import build_tuige_context, tuige_enabled
+from typing import Optional
+
+from tradingagents.tuige.context import TuigeContext, build_tuige_context, tuige_enabled
 from tradingagents.tuige.prompt_blocks import (
     format_setup_prompt_block,
     format_tuige_prompt_block,
+    get_regime_prompt_instructions,
 )
 
 CN_VERIFIED_DATA_RULES = """
@@ -24,35 +26,54 @@ CN_VERIFIED_DATA_RULES = """
 """
 
 
+def resolve_tuige_context(state: dict) -> Optional[TuigeContext]:
+    """Use graph-prefetched tuige_context when present; else one build with market inputs."""
+    raw = state.get("tuige_context")
+    if isinstance(raw, dict) and raw.get("enabled"):
+        return TuigeContext.from_dict(raw)
+
+    if not tuige_enabled():
+        return None
+
+    trade_date = state.get("trade_date") or ""
+    if not trade_date:
+        return None
+
+    ticker = state.get("company_of_interest") or ""
+    setup = (state.get("tuige_setup") or "").strip() or None
+
+    from tradingagents.tuige.market_inputs import fetch_tuige_market_inputs
+
+    market = fetch_tuige_market_inputs(trade_date)
+    ctx = build_tuige_context(
+        trade_date,
+        ticker=ticker or None,
+        quotes=market.quotes,
+        index_payload=market.index_payload,
+        industry_flows=market.industry_flows,
+        tuige_setup=setup,
+    )
+    return ctx if ctx.enabled else None
+
+
 def append_verified_market_facts(base_prompt: str, state: dict) -> str:
     block = (state.get("verified_market_facts") or "").strip()
     if not block:
         return base_prompt
 
-    ticker = state.get("company_of_interest") or ""
-    trade_date = state.get("trade_date") or ""
+    ctx = resolve_tuige_context(state)
+    setup = (state.get("tuige_setup") or "").strip()
 
-    regime = detect_market_regime(ticker, trade_date)
-    regime_instructions = get_regime_prompt_instructions(regime)
-
-    tuige_block = ""
-    setup_block = ""
-    if tuige_enabled():
-        setup = (state.get("tuige_setup") or "").strip()
-        ctx = build_tuige_context(
-            trade_date,
-            ticker=ticker or None,
-            tuige_setup=setup or None,
-        )
-        tuige_block = format_tuige_prompt_block(ctx)
-        if setup:
-            setup_block = format_setup_prompt_block(setup)
+    tuige_block = format_tuige_prompt_block(ctx) if ctx else ""
+    setup_block = format_setup_prompt_block(setup) if setup else ""
+    regime_instructions = get_regime_prompt_instructions(ctx.effective_regime) if ctx else ""
 
     parts = [base_prompt.rstrip(), CN_VERIFIED_DATA_RULES]
     if tuige_block:
         parts.append(tuige_block)
     if setup_block:
         parts.append(setup_block)
-    parts.append(regime_instructions)
+    if regime_instructions:
+        parts.append(regime_instructions)
     parts.append(block)
     return "\n\n".join(parts) + "\n"

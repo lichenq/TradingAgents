@@ -87,6 +87,10 @@ class AgentState(MessagesState):
         str,
         "Compact Tuige market context summary for reports",
     ]
+    tuige_context: Annotated[
+        Dict[str, Any],
+        "Serialized TuigeContext for debate prompts (avoid duplicate fetches)",
+    ]
     scheduled_event_alerts: Annotated[
         List[Dict[str, Any]],
         "Forward-looking scheduled corporate events (unlock, disclosure, ex-dividend)",

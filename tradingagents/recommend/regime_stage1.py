@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import FrozenSet, List, Optional
+from typing import FrozenSet
 
-from tradingagents.tuige.context import TuigeContext, tuige_strict
+from tradingagents.tuige.context import TuigeContext
 from tradingagents.tuige.stage1_advisory import stage1_advisory_for_regime
 
 
@@ -29,12 +29,6 @@ def regime_stage1_params(regime: str, rebalance_window: str = "no") -> RegimeSta
         note=adv.note,
         reminders=adv.reminders,
     )
-
-
-def detect_book_regime(trade_date: str, quotes: Optional[List] = None) -> str:
-    from tradingagents.agents.utils.market_regime import detect_book_regime as _detect
-
-    return _detect(trade_date, quotes=quotes)
 
 
 def build_regime_stage1_from_context(ctx: TuigeContext) -> RegimeStage1Params:
