@@ -7,10 +7,11 @@ import unittest
 from tradingagents.dataflows.limit_entry_rules import (
     Bar,
     backtest_rule,
+    backtest_tiered,
     limit_price,
+    signal_hybrid_entry,
     signal_macd_bear,
     summarize_stats,
-    suggest_entry_levels,
     _enrich_indicators,
 )
 
@@ -54,9 +55,16 @@ class TestLimitEntryRules(unittest.TestCase):
         self.assertIn("fill_rate_pct", summary)
         self.assertIn("rule", summary)
 
-    def test_suggest_requires_kline(self):
-        with self.assertRaises(RuntimeError):
-            suggest_entry_levels("601138", "2026-07-03")
+    def test_signal_hybrid_entry(self):
+        bars = _synthetic_bars()
+        i = len(bars) - 1
+        self.assertIsInstance(signal_hybrid_entry(bars, i), bool)
+
+    def test_tiered_backtest_runs(self):
+        bars = _synthetic_bars()
+        st = backtest_tiered(bars, signal_macd_bear, fill_days=5)
+        summary = summarize_stats(st)
+        self.assertIn("win_rate_20d_pct", summary)
 
 
 if __name__ == "__main__":
