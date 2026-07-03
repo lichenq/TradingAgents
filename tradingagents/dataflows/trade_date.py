@@ -104,3 +104,15 @@ def cn_trading_sessions_after(rec_date: str, as_of: date) -> int:
     rec_s = rec_d.strftime("%Y-%m-%d")
     as_of_s = as_of.strftime("%Y-%m-%d")
     return len([d for d in days if d > rec_s and d <= as_of_s])
+
+
+def cn_trading_days_until(trade_date: str, event_date: str) -> int:
+    """Trading sessions strictly after trade_date through event_date (inclusive)."""
+    start = datetime.strptime(str(trade_date)[:10], "%Y-%m-%d").date()
+    end = datetime.strptime(str(event_date)[:10], "%Y-%m-%d").date()
+    if end <= start:
+        return 0
+    days = sorted(_cn_trading_days_between(start, end))
+    start_s = start.strftime("%Y-%m-%d")
+    end_s = end.strftime("%Y-%m-%d")
+    return len([d for d in days if d > start_s and d <= end_s])

@@ -31,8 +31,16 @@ class CnPrefetchNewsTests(unittest.TestCase):
                 return_value="xueqiu ok",
             ),
             patch(
-                "tradingagents.dataflows.cn_sentiment.fetch_events_block",
-                return_value="events ok",
+                "tradingagents.dataflows.a_share_runner.run_script",
+                return_value=(True, "", {
+                    "code": "688981",
+                    "scheduled_events": {"upcoming": [], "count": 0},
+                    "performance": {"count": 0},
+                    "holder_change_buyback": {"count": 0},
+                    "regulatory": {"count": 0},
+                    "major_contracts": {"count": 0},
+                    "sentiment": {"count": 0},
+                }),
             ),
             patch(
                 "tradingagents.dataflows.cn_technical.fetch_and_cache_cn_technical",

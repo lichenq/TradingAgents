@@ -7,6 +7,7 @@
 3) 监管事项
 4) 重大订单合同
 5) 舆情热度方向
+6) 排期事件（限售解禁 / 预约披露 / 除权除息）
 
 依赖：pip install akshare pandas
 """
@@ -19,7 +20,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -520,6 +521,229 @@ def query_sentiment(code6: str, limit: int, deadline_ts: float) -> Dict:
     }
 
 
+def _parse_event_date(raw) -> Optional[date]:
+    if raw is None or raw == "" or str(raw) in ("NaT", "nan", "None"):
+        return None
+    s = str(raw)[:10]
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            pass
+    return None
+
+
+def _disclosure_periods(today: date) -> List[str]:
+    y = today.year
+    m = today.month
+    periods: List[str] = []
+    if m <= 4:
+        periods.append(f"{y}一季")
+    if m <= 8:
+        periods.append(f"{y}半年报")
+    if m <= 10:
+        periods.append(f"{y}三季")
+    periods.append(f"{y}年报")
+    out: List[str] = []
+    for p in periods:
+        if p not in out:
+            out.append(p)
+    return out[:2]
+
+
+def _append_restricted_release(code6: str, today: date, horizon: date, upcoming: List[Dict], deadline_ts: float) -> None:
+    seen_dates = {u.get("event_date") for u in upcoming}
+
+    def _push(row: Dict, source: str) -> None:
+        event_d = _parse_event_date(row.get("event_date") or row.get("解禁日期") or row.get("解禁时间"))
+        if not event_d or event_d < today or event_d > horizon:
+            return
+        key = str(event_d)
+        if key in seen_dates:
+            return
+        shares_wan = row.get("shares_wan")
+        if shares_wan is None:
+            raw_shares = row.get("解禁数量")
+            try:
+                shares_wan = float(raw_shares) if raw_shares is not None else None
+            except (TypeError, ValueError):
+                shares_wan = None
+        pct = row.get("pct_of_float")
+        if pct is None:
+            raw_pct = row.get("占流通市值比例") or row.get("占总市值比例")
+            try:
+                pct = float(raw_pct) if raw_pct is not None else None
+            except (TypeError, ValueError):
+                pct = None
+        mv = row.get("market_value_yi")
+        if mv is None:
+            raw_mv = row.get("解禁股流通市值") or row.get("实际解禁数量市值")
+            try:
+                mv = float(raw_mv) if raw_mv is not None else None
+            except (TypeError, ValueError):
+                mv = None
+        upcoming.append(
+            {
+                "type": "restricted_release",
+                "event_date": key,
+                "announce_date": str(row.get("公告日期") or row.get("announce_date") or "")[:10],
+                "shares_wan": shares_wan,
+                "market_value_yi": mv,
+                "pct_of_float": pct,
+                "batch": row.get("上市批次") or row.get("序号"),
+                "source": source,
+            }
+        )
+        seen_dates.add(key)
+
+    if _remaining_seconds(deadline_ts) > 1:
+        try:
+            df = _safe_ak_call(
+                ak.stock_restricted_release_queue_sina,
+                symbol=code6,
+                timeout_sec=min(8, _remaining_seconds(deadline_ts)),
+            )
+            for rec in _to_records(df):
+                _push(
+                    {
+                        "解禁日期": rec.get("解禁日期"),
+                        "解禁数量": rec.get("解禁数量"),
+                        "解禁股流通市值": rec.get("解禁股流通市值"),
+                        "公告日期": rec.get("公告日期"),
+                        "上市批次": rec.get("上市批次"),
+                    },
+                    "sina",
+                )
+        except Exception:
+            pass
+
+    if _remaining_seconds(deadline_ts) > 1:
+        try:
+            df = _safe_ak_call(
+                ak.stock_restricted_release_queue_em,
+                symbol=code6,
+                timeout_sec=min(8, _remaining_seconds(deadline_ts)),
+            )
+            for rec in _to_records(df):
+                shares = rec.get("解禁数量")
+                shares_wan = None
+                if shares is not None:
+                    try:
+                        shares_wan = float(shares) / 10000.0
+                    except (TypeError, ValueError):
+                        shares_wan = None
+                mv = rec.get("实际解禁数量市值")
+                mv_yi = None
+                if mv is not None:
+                    try:
+                        mv_yi = float(mv) / 1e8
+                    except (TypeError, ValueError):
+                        mv_yi = None
+                _push(
+                    {
+                        "解禁时间": rec.get("解禁时间"),
+                        "shares_wan": shares_wan,
+                        "market_value_yi": mv_yi,
+                        "占流通市值比例": rec.get("占流通市值比例"),
+                        "序号": rec.get("序号"),
+                    },
+                    "em",
+                )
+        except Exception:
+            pass
+
+
+def _append_earnings_disclosure(code6: str, today: date, horizon: date, upcoming: List[Dict], deadline_ts: float) -> None:
+    for period in _disclosure_periods(today):
+        if _remaining_seconds(deadline_ts) <= 1:
+            break
+        try:
+            df = _safe_ak_call(
+                ak.stock_report_disclosure,
+                market="沪深京",
+                period=period,
+                timeout_sec=min(10, _remaining_seconds(deadline_ts)),
+            )
+        except Exception:
+            continue
+        if df is None or df.empty or "股票代码" not in df.columns:
+            continue
+        filtered = df[df["股票代码"].astype(str).str.zfill(6) == code6]
+        if filtered.empty:
+            continue
+        row = filtered.iloc[0].to_dict()
+        if row.get("实际披露") and str(row.get("实际披露")) not in ("NaT", "nan", ""):
+            continue
+        event_d = None
+        for col in ("三次变更", "二次变更", "初次变更", "首次预约"):
+            event_d = _parse_event_date(row.get(col))
+            if event_d:
+                break
+        if not event_d or event_d < today or event_d > horizon:
+            continue
+        upcoming.append(
+            {
+                "type": "earnings_disclosure",
+                "event_date": str(event_d),
+                "report_period": period,
+                "first_schedule": str(row.get("首次预约") or "")[:10],
+                "source": "cninfo",
+            }
+        )
+        break
+
+
+def _append_ex_dividend(code6: str, today: date, horizon: date, upcoming: List[Dict], deadline_ts: float) -> None:
+    if _remaining_seconds(deadline_ts) <= 1:
+        return
+    try:
+        df = _safe_ak_call(
+            ak.stock_fhps_detail_em,
+            symbol=code6,
+            timeout_sec=min(10, _remaining_seconds(deadline_ts)),
+        )
+    except Exception:
+        return
+    if df is None or df.empty:
+        return
+    seen = {f"{u.get('type')}:{u.get('event_date')}" for u in upcoming}
+    for rec in _to_records(df):
+        event_d = _parse_event_date(rec.get("除权除息日"))
+        if not event_d or event_d < today or event_d > horizon:
+            continue
+        progress = str(rec.get("方案进度") or "")
+        if progress and "实施" not in progress and "通过" not in progress and "分配" not in progress:
+            continue
+        key = f"ex_dividend:{event_d}"
+        if key in seen:
+            continue
+        upcoming.append(
+            {
+                "type": "ex_dividend",
+                "event_date": str(event_d),
+                "report_period": str(rec.get("报告期") or "")[:10],
+                "cash_dividend": rec.get("现金分红-现金分红比例"),
+                "transfer_ratio": rec.get("送转股份-送转总比例"),
+                "register_date": str(rec.get("股权登记日") or "")[:10],
+                "progress": progress,
+                "source": "em",
+            }
+        )
+        seen.add(key)
+
+
+def query_scheduled_events(code6: str, deadline_ts: float, *, horizon_days: int = 60) -> Dict:
+    """Forward-looking corporate calendar events within horizon_days."""
+    today = datetime.now().date()
+    horizon = today + timedelta(days=horizon_days)
+    upcoming: List[Dict] = []
+    _append_restricted_release(code6, today, horizon, upcoming, deadline_ts)
+    _append_earnings_disclosure(code6, today, horizon, upcoming, deadline_ts)
+    _append_ex_dividend(code6, today, horizon, upcoming, deadline_ts)
+    upcoming.sort(key=lambda x: x.get("event_date", ""))
+    return {"category": "排期事件", "upcoming": upcoming, "count": len(upcoming)}
+
+
 def build_payload(code: str, stock_name: Optional[str], dates: List[str], limit: int, max_seconds: int, skip_sentiment: bool) -> Dict:
     code6 = normalize_code(code)
     # 事件查询超时上限：60s（避免长时间阻塞）
@@ -549,17 +773,18 @@ def build_payload(code: str, stock_name: Optional[str], dates: List[str], limit:
         "direction": "未知",
         "count": 0,
     }
+    scheduled = {"category": "排期事件", "upcoming": [], "count": 0}
 
-    # 三大模块并行：业绩 / 新闻分类 / 舆情
-    workers = 3 if not skip_sentiment else 2
+    workers = 4 if not skip_sentiment else 3
     with ThreadPoolExecutor(max_workers=workers) as ex:
         fut_perf = ex.submit(query_performance, code6, dates, limit, deadline_ts)
         fut_news = ex.submit(query_news_categories, code6, stock_name, limit, deadline_ts)
+        fut_sched = ex.submit(query_scheduled_events, code6, deadline_ts)
         fut_sent = None
         if not skip_sentiment and _remaining_seconds(deadline_ts) > 1:
             fut_sent = ex.submit(query_sentiment, code6, limit, deadline_ts)
 
-        for key, fut in [("perf", fut_perf), ("news", fut_news), ("sent", fut_sent)]:
+        for key, fut in [("perf", fut_perf), ("news", fut_news), ("sched", fut_sched), ("sent", fut_sent)]:
             if fut is None:
                 continue
             remain = max(1, _remaining_seconds(deadline_ts))
@@ -569,6 +794,8 @@ def build_payload(code: str, stock_name: Optional[str], dates: List[str], limit:
                     perf = val
                 elif key == "news":
                     news_blocks = val
+                elif key == "sched":
+                    scheduled = val
                 elif key == "sent":
                     sentiment = val
             except FuturesTimeoutError:
@@ -588,6 +815,7 @@ def build_payload(code: str, stock_name: Optional[str], dates: List[str], limit:
         "regulatory": news_blocks["regulatory"],
         "major_contracts": news_blocks["major_contracts"],
         "sentiment": sentiment,
+        "scheduled_events": scheduled,
     }
 
 
@@ -629,6 +857,11 @@ def print_text(payload: Dict, preview: int) -> None:
         print(f"  - 趋势 | {item.get('时间', '')} | 排名: {item.get('排名', '')} | 新晋粉丝: {item.get('新晋粉丝', '')}")
     for item in st.get("baidu_hot", [])[:preview]:
         print(f"  - 百度热度 | {item.get('名称/代码', '')} | 综合热度: {item.get('综合热度', '')}")
+
+    se = payload.get("scheduled_events") or {}
+    print(f"\n6) 排期事件（未来60日）：{se.get('count', 0)} 条")
+    for item in (se.get("upcoming") or [])[:preview]:
+        print(f"  - {item.get('type', '')} | {item.get('event_date', '')} | {item}")
 
 
 def _parse_code_list(raw: str) -> List[str]:

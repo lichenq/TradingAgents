@@ -1,4 +1,4 @@
-from typing import Annotated, Dict, List
+from typing import Annotated, Any, Dict, List
 from typing_extensions import TypedDict
 from langgraph.graph import MessagesState
 
@@ -86,6 +86,10 @@ class AgentState(MessagesState):
     tuige_context_summary: Annotated[
         str,
         "Compact Tuige market context summary for reports",
+    ]
+    scheduled_event_alerts: Annotated[
+        List[Dict[str, Any]],
+        "Forward-looking scheduled corporate events (unlock, disclosure, ex-dividend)",
     ]
     report_quality_notes: Annotated[
         str,

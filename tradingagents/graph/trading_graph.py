@@ -406,10 +406,11 @@ class TradingAgentsGraph:
                 + (" …" if len(extra) > 3 else "")
             )
 
-        from tradingagents.dataflows.cn_prefetch import run_cn_prefetch
-        from tradingagents.market import cn_uses_a_share_skill
+        from tradingagents.dataflows.cn_prefetch import run_cn_prefetch, get_prefetched_json
+        from tradingagents.market import cn_uses_a_share_skill, normalize_a_share_code
 
         verified_market_facts = ""
+        scheduled_event_alerts: List[Dict[str, Any]] = []
         if cn_uses_a_share_skill(company_name, self.config):
             workers = max(1, int(self.config.get("analyst_concurrency_limit", 4)))
             if progress_logger:
@@ -425,9 +426,26 @@ class TradingAgentsGraph:
             )
             from tradingagents.dataflows.cn_technical import require_cn_technical_ready
             from tradingagents.dataflows.cn_valuation import require_cn_valuation_ready
+            from tradingagents.dataflows.scheduled_events import (
+                build_scheduled_alerts,
+                enrich_verified_with_scheduled_events,
+            )
 
             verified_market_facts = require_cn_valuation_ready(company_name, self.config)
             require_cn_technical_ready(company_name)
+            code6 = normalize_a_share_code(company_name)
+            events_payload = get_prefetched_json(f"events_raw:{code6}")
+            scheduled_event_alerts = build_scheduled_alerts(events_payload, str(trade_date))
+            verified_market_facts = enrich_verified_with_scheduled_events(
+                verified_market_facts,
+                scheduled_event_alerts,
+            )
+            if scheduled_event_alerts and progress_logger:
+                top = scheduled_event_alerts[0]
+                progress_logger.log_detail(
+                    f"排期事件: {top.get('label')} {top.get('event_date')} "
+                    f"({top.get('trading_days_until')}交易日, {top.get('severity')})"
+                )
             progress_extra = (
                 [f"分析师并行度: {workers}（市场/情绪/新闻/基本面同时跑）"]
                 + prefetch_lines[:8]
@@ -483,6 +501,8 @@ class TradingAgentsGraph:
         )
         if verified_market_facts:
             init_agent_state["verified_market_facts"] = verified_market_facts
+        if scheduled_event_alerts:
+            init_agent_state["scheduled_event_alerts"] = scheduled_event_alerts
 
         tuige_setup = (self.config.get("tuige_setup") or "").strip()
         tuige_ctx_dict: Optional[Dict[str, Any]] = None

@@ -13,19 +13,30 @@ from tradingagents.market import cn_uses_a_share_skill, normalize_a_share_code
 logger = logging.getLogger(__name__)
 
 _PREFETCH_CACHE: Dict[str, str] = {}
+_PREFETCH_JSON: Dict[str, Any] = {}
 
 
 def get_prefetched(key: str) -> Optional[str]:
     return _PREFETCH_CACHE.get(key)
 
 
+def get_prefetched_json(key: str) -> Optional[Any]:
+    return _PREFETCH_JSON.get(key)
+
+
 def clear_prefetch_cache() -> None:
     _PREFETCH_CACHE.clear()
+    _PREFETCH_JSON.clear()
 
 
 def _cache(key: str, value: str) -> None:
     if value:
         _PREFETCH_CACHE[key] = value
+
+
+def _cache_json(key: str, value: Any) -> None:
+    if value is not None:
+        _PREFETCH_JSON[key] = value
 
 
 def run_cn_prefetch(
@@ -72,9 +83,21 @@ def run_cn_prefetch(
         return "xueqiu", "ok" if block else "empty"
 
     def task_events() -> Tuple[str, str]:
-        from tradingagents.dataflows.cn_sentiment import fetch_events_block
+        from tradingagents.dataflows.a_share_runner import run_script
+        from tradingagents.dataflows.cn_sentiment import _format_events_payload
 
-        block = fetch_events_block(ticker, limit=15)
+        ok, raw, data = run_script(
+            "fetch_stock_events.py",
+            ["--code", code6, "--limit", str(15), "--json"],
+            timeout=55,
+        )
+        if ok and isinstance(data, dict):
+            _cache_json(f"events_raw:{code6}", data)
+            block = _format_events_payload(data, trade_date=trade_date)
+            _cache(f"events:{code6}", block)
+            sched = (data.get("scheduled_events") or {}).get("count", 0)
+            return "events", f"ok · 排期{sched}"
+        block = raw if raw else "<a_share events unavailable>"
         _cache(f"events:{code6}", block)
         return "events", "ok" if block else "empty"
 

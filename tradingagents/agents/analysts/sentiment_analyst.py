@@ -51,7 +51,7 @@ def create_sentiment_analyst(llm, *, analyst_thread_key: str | None = None):
         if market == "cn":
             news_block = get_news.func(ticker, start_date, end_date)
             xueqiu_block = fetch_xueqiu_block(ticker)
-            events_block = fetch_events_block(ticker)
+            events_block = fetch_events_block(ticker, trade_date=end_date)
             system_message = _build_cn_system_message(
                 ticker=ticker,
                 start_date=start_date,

@@ -54,13 +54,33 @@ def _format_xueqiu_fallback(payload: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def fetch_events_block(ticker: str, *, limit: int = 30) -> str:
+def fetch_events_payload(ticker: str, *, limit: int = 30) -> Optional[Dict[str, Any]]:
+    code6 = normalize_a_share_code(ticker)
+    from tradingagents.dataflows.cn_prefetch import get_prefetched_json
+
+    cached = get_prefetched_json(f"events_raw:{code6}")
+    if cached:
+        return cached
+    ok, _raw, data = run_script(
+        "fetch_stock_events.py",
+        ["--code", code6, "--limit", str(limit), "--json"],
+        timeout=55,
+    )
+    if ok and isinstance(data, dict):
+        return data
+    return None
+
+
+def fetch_events_block(ticker: str, *, limit: int = 30, trade_date: str = "") -> str:
     code6 = normalize_a_share_code(ticker)
     from tradingagents.dataflows.cn_prefetch import get_prefetched
 
     cached = get_prefetched(f"events:{code6}")
     if cached:
         return cached
+    payload = fetch_events_payload(ticker, limit=limit)
+    if payload:
+        return _format_events_payload(payload, trade_date=trade_date)
     ok, raw, data = run_script(
         "fetch_stock_events.py",
         ["--code", code6, "--limit", str(limit), "--json"],
@@ -69,13 +89,26 @@ def fetch_events_block(ticker: str, *, limit: int = 30) -> str:
     if not ok or not isinstance(data, dict):
         return raw if raw else "<a_share events unavailable>"
 
-    return _format_events_payload(data)
+    return _format_events_payload(data, trade_date=trade_date)
 
 
-def _format_events_payload(payload: Dict[str, Any]) -> str:
+def _format_events_payload(payload: Dict[str, Any], *, trade_date: str = "") -> str:
     code = payload.get("code", "")
     name = payload.get("name") or ""
     lines = [f"## A股事件与舆情 · {code} {name}".strip(), ""]
+
+    if trade_date:
+        from tradingagents.dataflows.scheduled_events import (
+            build_scheduled_alerts,
+            format_scheduled_events_block,
+        )
+
+        sched_block = format_scheduled_events_block(
+            build_scheduled_alerts(payload, trade_date)
+        )
+        if sched_block:
+            lines.append(sched_block)
+            lines.append("")
 
     for section, title in (
         ("performance", "业绩/预告"),
