@@ -58,7 +58,7 @@ class TestDeepSeekReasoningContent:
     def _client(self):
         os.environ.setdefault("DEEPSEEK_API_KEY", "placeholder")
         return DeepSeekChatOpenAI(
-            model="deepseek-v4-flash",
+            model="deepseek-flash",
             api_key="placeholder",
             base_url="https://api.deepseek.com",
         )
@@ -69,7 +69,7 @@ class TestDeepSeekReasoningContent:
         client = self._client()
         result = client._create_chat_result(
             {
-                "model": "deepseek-v4-flash",
+                "model": "deepseek-flash",
                 "choices": [
                     {
                         "index": 0,
@@ -154,6 +154,11 @@ class TestStructuredOutputCapabilityDispatch:
             "tool_choice" not in _bound_kwargs(bound)
 
     def test_v4_flash_suppresses_tool_choice(self):
+        bound = self._client("deepseek-flash").with_structured_output(self._Sample)
+        assert _bound_kwargs(bound).get("tool_choice") is None or \
+            "tool_choice" not in _bound_kwargs(bound)
+
+    def test_legacy_v4_flash_suppresses_tool_choice(self):
         bound = self._client("deepseek-v4-flash").with_structured_output(self._Sample)
         assert _bound_kwargs(bound).get("tool_choice") is None or \
             "tool_choice" not in _bound_kwargs(bound)
@@ -196,7 +201,7 @@ def _has_real_deepseek_key():
     reason="DEEPSEEK_API_KEY not set (or placeholder); skipping live API call",
 )
 class TestDeepSeekLiveStructuredOutput:
-    """End-to-end: a real DeepSeek V4-flash call returns a typed instance.
+    """End-to-end: a real DeepSeek V4.1 Flash call returns a typed instance.
 
     Verifies the no-tool_choice path doesn't trigger the 400 reported in
     issue #678 and that the structured-output binding still parses to a
@@ -207,9 +212,9 @@ class TestDeepSeekLiveStructuredOutput:
         action: str
         confidence: float
 
-    def test_v4_flash_returns_structured_output(self):
+    def test_flash_returns_structured_output(self):
         client = DeepSeekChatOpenAI(
-            model="deepseek-v4-flash",
+            model="deepseek-flash",
             api_key=os.environ["DEEPSEEK_API_KEY"],
             base_url="https://api.deepseek.com",
             timeout=60,

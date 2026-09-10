@@ -95,6 +95,7 @@ _DEFAULT = ModelCapabilities(
 _BY_ID: dict[str, ModelCapabilities] = {
     "deepseek-chat": _DEEPSEEK_CHAT,
     "deepseek-reasoner": _DEEPSEEK_THINKING,
+    "deepseek-flash": _DEEPSEEK_THINKING,
     "deepseek-v4-flash": _DEEPSEEK_THINKING,
     "deepseek-v4-pro": _DEEPSEEK_THINKING,
     # MiniMax — full official model lineup per
@@ -108,9 +109,10 @@ _BY_ID: dict[str, ModelCapabilities] = {
     "MiniMax-M2": _MINIMAX_THINKING,
 }
 
-# Forward-compat patterns. New ``deepseek-v5-*`` / ``deepseek-reasoner-*``
-# or ``MiniMax-M3*`` variants inherit the thinking-mode quirks automatically.
+# Forward-compat patterns. New ``deepseek-flash*`` / ``deepseek-v5-*`` /
+# ``deepseek-reasoner-*`` or ``MiniMax-M3*`` variants inherit thinking quirks.
 _BY_PATTERN: list[tuple[re.Pattern[str], ModelCapabilities]] = [
+    (re.compile(r"^deepseek-flash"), _DEEPSEEK_THINKING),
     (re.compile(r"^deepseek-v\d"), _DEEPSEEK_THINKING),
     (re.compile(r"^deepseek-reasoner"), _DEEPSEEK_THINKING),
     (re.compile(r"^MiniMax-M\d"), _MINIMAX_THINKING),

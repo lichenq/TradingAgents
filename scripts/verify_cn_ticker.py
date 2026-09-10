@@ -38,8 +38,8 @@ def main() -> int:
     config = DEFAULT_CONFIG.copy()
     config["market_profile"] = "cn"
     config["llm_provider"] = "deepseek"
-    config["deep_think_llm"] = "deepseek-v4-pro"
-    config["quick_think_llm"] = "deepseek-v4-flash"
+    config["deep_think_llm"] = "deepseek-flash"
+    config["quick_think_llm"] = "deepseek-flash"
     config["output_language"] = "Chinese"
     from tradingagents.default_config import apply_market_profile
 
