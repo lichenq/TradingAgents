@@ -27,7 +27,12 @@ BOARDS_SUMMARY_URL = "https://dang-invest.com/api/market/boards/summary"
 BOARDS_DETAIL_URL = "https://dang-invest.com/api/market/boards/detail"
 
 # EastMoney API configurations
-EM_FUND_FLOW_URL = "https://push2delay.eastmoney.com/api/qt/stock/fflow/daykline/get"
+EM_FUND_FLOW_HOSTS = (
+    "https://push2his.eastmoney.com",
+    "https://push2delay.eastmoney.com",
+    "https://push2.eastmoney.com",
+)
+EM_FUND_FLOW_PATH = "/api/qt/stock/fflow/daykline/get"
 EM_FUND_FLOW_UT = "b2884a393a59ad64002292a3e90d46a5"
 
 
@@ -87,7 +92,10 @@ def get_sector_top_companies(group_key: str, limit: int = 3) -> List[dict]:
     if payload and "data" in payload:
         data_block = payload.get("data") or {}
         if isinstance(data_block, dict):
-            return data_block.get("items") or []
+            items = data_block.get("items") or []
+            return items[:limit]
+        elif isinstance(data_block, list):
+            return data_block[:limit]
     return []
 
 
@@ -117,7 +125,11 @@ def fetch_stock_fund_flow_days(code: str, days: int = 3) -> List[dict]:
         "_": str(int(time.time() * 1000))
     }
 
-    payload = _http_get_json(EM_FUND_FLOW_URL, params)
+    payload = None
+    for host in EM_FUND_FLOW_HOSTS:
+        payload = _http_get_json(f"{host}{EM_FUND_FLOW_PATH}", params)
+        if payload and payload.get("rc") == 0 and payload.get("data"):
+            break
     if not payload or payload.get("rc") != 0 or not payload.get("data"):
         return []
 

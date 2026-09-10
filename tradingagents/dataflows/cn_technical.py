@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from tradingagents.dataflows.a_share_runner import run_script
 from tradingagents.dataflows.cn_prefetch import _cache, get_prefetched
-from tradingagents.market import normalize_a_share_code
+from tradingagents.market import normalize_a_share_code, to_a_share_skill_code
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +118,11 @@ def format_cn_technical_block(
 
 def fetch_and_cache_cn_technical(ticker: str, trade_date: str) -> Tuple[str, bool]:
     code6 = normalize_a_share_code(ticker)
+    skill_code = to_a_share_skill_code(ticker)
     ok, raw, rows = run_script(
         "fetch_technical.py",
         [
-            code6,
+            skill_code,
             "--freq",
             "1d",
             "--count",

@@ -38,6 +38,13 @@ def to_yahoo_a_share_symbol(code6: str) -> str:
     return f"{c}.SZ"
 
 
+def to_a_share_skill_code(code6: str) -> str:
+    """Return exchange-prefixed code for a-share-data skill (``sz159530`` / ``sh600519``)."""
+    c = normalize_a_share_code(code6)
+    prefix = "sh" if c.startswith(("5", "6", "9")) else "sz"
+    return f"{prefix}{c}"
+
+
 def is_cn_ticker(ticker: str, *, market_profile: Optional[str] = None) -> bool:
     """True when ticker or explicit profile indicates China A-share context."""
     if market_profile and market_profile.strip().lower() in ("cn", "a", "a_share", "china"):

@@ -103,10 +103,16 @@ def run_cn_prefetch(
 
     def task_kline() -> Tuple[str, str]:
         from tradingagents.dataflows.a_share import _build_a_share_ohlcv_block
+        from tradingagents.dataflows.limit_entry_rules import _parse_kline_csv
 
         block = _build_a_share_ohlcv_block(ticker, start, trade_date, use_cache=False)
-        _cache(f"kline:{code6}", block)
-        return "kline", "ok" if block else "empty"
+        bars = _parse_kline_csv(block)
+        if len(bars) >= 30:
+            _cache(f"kline:{code6}", block)
+            return "kline", "ok"
+        if block:
+            return "kline", f"FAILED · {len(bars)} bars"
+        return "kline", "empty"
 
     def task_valuation() -> Tuple[str, str]:
         from tradingagents.dataflows.cn_valuation import fetch_and_cache_cn_valuation

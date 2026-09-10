@@ -6,11 +6,17 @@ import unittest
 
 from tradingagents.dataflows.limit_entry_rules import (
     Bar,
+    _aggressive_tier_prices,
+    _conservative_tier_prices,
+    _format_stats_line,
+    backtest_track_stats,
     backtest_rule,
     backtest_tiered,
     limit_price,
     signal_hybrid_entry,
     signal_macd_bear,
+    signal_macd_only,
+    signal_sharp_entry,
     summarize_stats,
     _enrich_indicators,
 )
@@ -65,6 +71,35 @@ class TestLimitEntryRules(unittest.TestCase):
         st = backtest_tiered(bars, signal_macd_bear, fill_days=5)
         summary = summarize_stats(st)
         self.assertIn("win_rate_20d_pct", summary)
+
+    def test_dual_track_macd_only(self):
+        bars = _synthetic_bars()
+        i = len(bars) - 1
+        bars[i].pct = -1.5
+        bars[i].close = bars[i].ma20 * 0.97 if bars[i].ma20 else bars[i].close
+        _enrich_indicators(bars)
+        aggressive = _aggressive_tier_prices(bars, i, bars[i].close)
+        conservative = _conservative_tier_prices(bars, i, bars[i].close)
+        if signal_hybrid_entry(bars, i) and not signal_macd_bear(bars, i):
+            self.skipTest("synthetic bars did not produce macd-only path")
+        if aggressive.get("first") and conservative.get("mode") == "macd_only":
+            self.assertTrue(aggressive["hang"])
+            self.assertFalse(conservative["hang"])
+            self.assertLessEqual(conservative["first"], aggressive["first"])
+
+    def test_backtest_track_stats(self):
+        bars = _synthetic_bars()
+        st = backtest_track_stats(bars, signal_hybrid_entry)
+        self.assertIn("fill_rate_pct", st)
+        self.assertIn("win_rate_20d_pct", st)
+        line = _format_stats_line("激进轨", st)
+        self.assertIn("成交率", line)
+        self.assertIn("胜率", line)
+
+    def test_signal_macd_only_vs_sharp_disjoint(self):
+        bars = _synthetic_bars()
+        i = len(bars) - 1
+        self.assertFalse(signal_macd_only(bars, i) and signal_sharp_entry(bars, i))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from dateutil.relativedelta import relativedelta
 from tradingagents.dataflows.a_share_runner import run_script
 from tradingagents.dataflows.cn_market_dates import cn_indicator_end_date, cn_ohlcv_end_date
 from tradingagents.dataflows.cn_sentiment import fetch_cn_news_block
-from tradingagents.market import normalize_a_share_code, is_hk_ticker
+from tradingagents.market import normalize_a_share_code, is_hk_ticker, to_a_share_skill_code
 
 # Per-process cache: fundamentals analyst calls get_fundamentals + 3 statements → same fetch.
 _fundamentals_cache: Dict[tuple[str, str], str] = {}
@@ -154,7 +154,7 @@ def _build_a_share_ohlcv_block(
     ok, raw, rows = run_script(
         "fetch_history.py",
         [
-            "--kline", code6,
+            "--kline", to_a_share_skill_code(code6),
             "--start", start_date,
             "--end", ohlcv_end,
             "--freq", "1d",
