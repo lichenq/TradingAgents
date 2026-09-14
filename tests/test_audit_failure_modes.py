@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 from tradingagents.dataflows.audit_failure_modes import (
@@ -28,9 +29,13 @@ class TestAuditFailureModes(unittest.TestCase):
     def test_failure_mode_counts_from_db(self):
         with tempfile.TemporaryDirectory() as tmp:
             init_db(tmp)
+            # Audit lookback windows are relative to today; use recent dates so
+            # the fixtures stay inside them regardless of when the test runs.
+            rec_date = (date.today() - timedelta(days=10)).strftime("%Y-%m-%d")
+            audit_date = (date.today() - timedelta(days=5)).strftime("%Y-%m-%d")
             save_recommendation(
                 tmp,
-                "2026-06-01",
+                rec_date,
                 "trend_pullback",
                 {
                     "code": "sz000001",
@@ -47,8 +52,8 @@ class TestAuditFailureModes(unittest.TestCase):
             save_backtest_audit(
                 tmp,
                 "sz000001",
-                "2026-06-01",
-                "2026-06-05",
+                rec_date,
+                audit_date,
                 3,
                 10.0,
                 9.0,

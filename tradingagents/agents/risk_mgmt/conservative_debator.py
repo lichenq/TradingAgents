@@ -1,24 +1,36 @@
-from tradingagents.agents.risk_mgmt.debate_helpers import risk_reports_block
-from tradingagents.agents.utils.agent_utils import get_language_instruction
+from tradingagents.agents.utils.agent_utils import (
+    get_language_instruction,
+    opponent_argument_or_opening,
+)
 from tradingagents.agents.utils.position_context import get_position_assumption_instruction
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
-from tradingagents.graph.debate_context import (
-    format_risk_debate_history,
-    maybe_refresh_risk_summary,
-)
 
 
 def create_conservative_debator(llm):
     def conservative_node(state) -> dict:
+        # Imported here, not at module level: debate_helpers and
+        # tradingagents.graph import this package (circular import).
+        from tradingagents.agents.risk_mgmt.debate_helpers import risk_reports_block
+        from tradingagents.graph.debate_context import (
+            format_risk_debate_history,
+            maybe_refresh_risk_summary,
+        )
+
         risk_debate_state = state["risk_debate_state"]
         raw_history = risk_debate_state.get("history", "")
         conservative_history = risk_debate_state.get("conservative_history", "")
 
-        current_aggressive_response = risk_debate_state.get("current_aggressive_response", "")
-        current_neutral_response = risk_debate_state.get("current_neutral_response", "")
+        current_aggressive_response = opponent_argument_or_opening(
+            risk_debate_state.get("current_aggressive_response", ""),
+            "aggressive analyst",
+        )
+        current_neutral_response = opponent_argument_or_opening(
+            risk_debate_state.get("current_neutral_response", ""), "neutral analyst"
+        )
         debate_context = format_risk_debate_history(state, llm)
         quality_notes = (state.get("report_quality_notes") or "").strip()
         quality_block = f"\n{quality_notes}\n" if quality_notes else ""
+
         trader_decision = state["trader_investment_plan"]
 
         prompt = f"""As the Conservative Risk Analyst, your primary objective is to protect assets, minimize volatility, and ensure steady, reliable growth. You prioritize stability, security, and risk mitigation, carefully assessing potential losses, economic downturns, and market volatility. 

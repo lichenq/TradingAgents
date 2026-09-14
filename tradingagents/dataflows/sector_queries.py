@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 
 from tradingagents.dataflows.a_share_runner import run_script
 from tradingagents.dataflows.sector_mapping import (
-    expand_queries,
     get_search_keywords,
     resolve,
 )
@@ -39,12 +38,6 @@ def merge_news_queries(config: dict) -> List[str]:
             continue
         seen.add(text)
         merged.append(text)
-
-    # Expand queries through the sector mapping table — each query that
-    # contains a known sector name gets synonyms substituted automatically.
-    expanded = expand_queries(merged)
-    if expanded:
-        merged = expanded
 
     return merged
 

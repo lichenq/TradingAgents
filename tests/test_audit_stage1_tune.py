@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 from tradingagents.dataflows.audit_stage1_tune import compute_audit_stage1_tune
 from tradingagents.graph.storage import init_db, save_backtest_audit, save_recommendation
@@ -15,8 +15,12 @@ class TestAuditStage1Tune(unittest.TestCase):
     def test_tightens_on_high_pe_loss_streak(self):
         with tempfile.TemporaryDirectory() as tmp:
             init_db(tmp)
+            # Audit lookback windows are relative to today; use recent dates so
+            # the fixtures stay inside them regardless of when the test runs.
+            today = date.today()
             for i in range(3):
-                td = f"2026-06-{10 + i:02d}"
+                td = (today - timedelta(days=12 - i)).strftime("%Y-%m-%d")
+                audit_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
                 save_recommendation(
                     tmp,
                     td,
@@ -37,7 +41,7 @@ class TestAuditStage1Tune(unittest.TestCase):
                     tmp,
                     f"sz30040{i}",
                     td,
-                    "2026-06-20",
+                    audit_date,
                     3,
                     10.0,
                     9.0,

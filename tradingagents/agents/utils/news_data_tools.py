@@ -1,6 +1,9 @@
+from typing import Annotated
+
 from langchain_core.tools import tool
-from typing import Annotated, Optional
+
 from tradingagents.dataflows.interface import route_to_vendor
+
 
 @tool
 def get_news(
@@ -23,10 +26,10 @@ def get_news(
 @tool
 def get_global_news(
     curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    look_back_days: Annotated[Optional[int], "Days to look back; omit to use the configured default"] = None,
-    limit: Annotated[Optional[int], "Max articles to return; omit to use the configured default"] = None,
+    look_back_days: Annotated[int | None, "Days to look back; omit to use the configured default"] = None,
+    limit: Annotated[int | None, "Max articles to return; omit to use the configured default"] = None,
     ticker: Annotated[
-        Optional[str],
+        str | None,
         "Optional ticker; when set on CN runs, merges industry-specific search queries",
     ] = None,
 ) -> str:

@@ -1,24 +1,37 @@
-from tradingagents.agents.risk_mgmt.debate_helpers import risk_reports_block
-from tradingagents.agents.utils.agent_utils import get_language_instruction
+from tradingagents.agents.utils.agent_utils import (
+    get_language_instruction,
+    opponent_argument_or_opening,
+)
 from tradingagents.agents.utils.position_context import get_position_assumption_instruction
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
-from tradingagents.graph.debate_context import (
-    format_risk_debate_history,
-    maybe_refresh_risk_summary,
-)
 
 
 def create_neutral_debator(llm):
     def neutral_node(state) -> dict:
+        # Imported here, not at module level: debate_helpers and
+        # tradingagents.graph import this package (circular import).
+        from tradingagents.agents.risk_mgmt.debate_helpers import risk_reports_block
+        from tradingagents.graph.debate_context import (
+            format_risk_debate_history,
+            maybe_refresh_risk_summary,
+        )
+
         risk_debate_state = state["risk_debate_state"]
         raw_history = risk_debate_state.get("history", "")
         neutral_history = risk_debate_state.get("neutral_history", "")
 
-        current_aggressive_response = risk_debate_state.get("current_aggressive_response", "")
-        current_conservative_response = risk_debate_state.get("current_conservative_response", "")
+        current_aggressive_response = opponent_argument_or_opening(
+            risk_debate_state.get("current_aggressive_response", ""),
+            "aggressive analyst",
+        )
+        current_conservative_response = opponent_argument_or_opening(
+            risk_debate_state.get("current_conservative_response", ""),
+            "conservative analyst",
+        )
         debate_context = format_risk_debate_history(state, llm)
         quality_notes = (state.get("report_quality_notes") or "").strip()
         quality_block = f"\n{quality_notes}\n" if quality_notes else ""
+
         trader_decision = state["trader_investment_plan"]
 
         prompt = f"""As the Neutral Risk Analyst, your role is to provide a balanced perspective, weighing both the potential benefits and risks of the trader's decision or plan. You prioritize a well-rounded approach, evaluating the upsides and downsides while factoring in broader market trends, potential economic shifts, and diversification strategies.

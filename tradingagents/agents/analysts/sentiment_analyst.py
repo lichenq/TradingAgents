@@ -8,11 +8,18 @@ See: https://github.com/TauricResearch/TradingAgents/issues/557
 
 from datetime import datetime, timedelta
 
+from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from tradingagents.agents.schemas import SentimentReport, render_sentiment_report
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_language_instruction,
     get_news,
+)
+from tradingagents.agents.utils.structured import (
+    NO_EXTERNAL_TOOLS,
+    bind_structured,
+    invoke_structured_or_freetext,
 )
 from tradingagents.dataflows.config import get_config
 from tradingagents.dataflows.cn_sentiment import (
@@ -34,6 +41,7 @@ def _seven_days_back(trade_date: str) -> str:
 
 def create_sentiment_analyst(llm, *, analyst_thread_key: str | None = None):
     """Create a sentiment analyst node for the trading graph."""
+    structured_llm = bind_structured(llm, SentimentReport, "Sentiment Analyst")
 
     def sentiment_analyst_node(state):
         ticker = state["company_of_interest"]
@@ -62,8 +70,14 @@ def create_sentiment_analyst(llm, *, analyst_thread_key: str | None = None):
             )
         else:
             news_block = get_news.func(ticker, start_date, end_date)
-            stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
-            reddit_block = fetch_reddit_posts(ticker)
+            # Pass the analysis window so a historical run trims social posts
+            # to it instead of leaking today's chatter into a backtest (#1220).
+            stocktwits_block = fetch_stocktwits_messages(
+                ticker, limit=30, start_date=start_date, end_date=end_date
+            )
+            reddit_block = fetch_reddit_posts(
+                ticker, start_date=start_date, end_date=end_date
+            )
             system_message = _build_us_system_message(
                 ticker=ticker,
                 start_date=start_date,
@@ -80,8 +94,12 @@ def create_sentiment_analyst(llm, *, analyst_thread_key: str | None = None):
                     "You are a helpful AI assistant, collaborating with other assistants."
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
-                    "\n{system_message}\n"
-                    "For your reference, the current date is {current_date}. {instrument_context}",
+                    # No tool-calling here: the data is pre-fetched into the
+                    # prompt, so tool-range wording would only invite a
+                    # hallucinated tool call (#1130).
+                    " Today's date is {current_date}; treat it as 'now' for all analysis. {instrument_context}"
+                    " " + NO_EXTERNAL_TOOLS +
+                    "\n{system_message}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -91,15 +109,25 @@ def create_sentiment_analyst(llm, *, analyst_thread_key: str | None = None):
         prompt = prompt.partial(current_date=end_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
-        chain = prompt | llm
-        result = chain.invoke(analyst_invoke_messages(state, analyst_thread_key))
+        # Format the template into concrete messages so the structured and
+        # free-text paths see the same input.
+        formatted_messages = prompt.format_messages(
+            messages=analyst_invoke_messages(state, analyst_thread_key)
+        )
+        report_text = invoke_structured_or_freetext(
+            structured_llm,
+            llm,
+            formatted_messages,
+            render_sentiment_report,
+            "Sentiment Analyst",
+        )
 
         return analyst_node_return(
             state,
             thread_key=analyst_thread_key,
-            message=result,
+            message=AIMessage(content=report_text),
             report_key="sentiment_report",
-            report=result.content,
+            report=report_text,
         )
 
     return sentiment_analyst_node

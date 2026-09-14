@@ -74,6 +74,15 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_RISK_REGIME":         "position_context_regime",
     "TRADINGAGENTS_TUIGE_ENABLED":       "tuige_enabled",
     "TRADINGAGENTS_TUIGE_STRICT":        "tuige_strict",
+    "TRADINGAGENTS_TEMPERATURE":          "temperature",
+    "TRADINGAGENTS_LLM_MAX_RETRIES":      "llm_max_retries",
+    "TRADINGAGENTS_MAX_TOKENS":           "max_tokens",
+    # Provider-specific reasoning/thinking knobs (None = each provider's own
+    # default). Settable here for non-interactive runs; the CLI also offers an
+    # interactive choice, which is skipped when the matching var is set.
+    "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":   "google_thinking_level",
+    "TRADINGAGENTS_OPENAI_REASONING_EFFORT": "openai_reasoning_effort",
+    "TRADINGAGENTS_ANTHROPIC_EFFORT":        "anthropic_effort",
 }
 
 # Optional numeric overrides (defaults are None in DEFAULT_CONFIG).
@@ -83,10 +92,26 @@ _OPTIONAL_ENV_NUMERIC = {
 }
 
 
+_BOOL_TRUE = ("true", "1", "yes", "on")
+_BOOL_FALSE = ("false", "0", "no", "off")
+
+
 def _coerce(value: str, reference):
-    """Coerce env-var string to the type of the existing default value."""
+    """Coerce env-var string to the type of the existing default value.
+
+    Invalid values raise ``ValueError`` rather than silently falling back to a
+    default — a misspelled boolean (e.g. ``treu``) or non-numeric int should fail
+    loudly at startup, not quietly misconfigure an unattended run.
+    """
     if isinstance(reference, bool):
-        return value.strip().lower() in ("true", "1", "yes", "on")
+        normalized = value.strip().lower()
+        if normalized in _BOOL_TRUE:
+            return True
+        if normalized in _BOOL_FALSE:
+            return False
+        raise ValueError(
+            f"expected a boolean ({'/'.join(_BOOL_TRUE + _BOOL_FALSE)}), got {value!r}"
+        )
     if isinstance(reference, int) and not isinstance(reference, bool):
         return int(value)
     if isinstance(reference, float):
@@ -105,7 +130,10 @@ def _apply_env_overrides(config: dict) -> dict:
         raw = os.environ.get(env_var)
         if raw is None or raw == "":
             continue
-        config[key] = _coerce(raw, config.get(key))
+        try:
+            config[key] = _coerce(raw, config.get(key))
+        except ValueError as exc:
+            raise ValueError(f"Invalid value for {env_var}: {exc}") from exc
     return config
 
 
@@ -185,8 +213,8 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "market_profile": "us",
     # LLM settings
     "llm_provider": "openai",
-    "deep_think_llm": "gpt-5.4",
-    "quick_think_llm": "gpt-5.4-mini",
+    "deep_think_llm": "gpt-5.6",
+    "quick_think_llm": "gpt-5.6-luna",
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
     # The CLI overrides this per provider when the user picks one. Keeping a
@@ -197,6 +225,20 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
     "google_thinking_level": None,      # "high", "minimal", etc.
     "openai_reasoning_effort": None,    # "medium", "high", "low"
     "anthropic_effort": None,           # "high", "medium", "low"
+    # Sampling temperature, forwarded to every provider when set. None leaves
+    # each provider at its own default. Lower values reduce run-to-run
+    # variation on models that honor it; reasoning models largely ignore it
+    # and no setting makes LLM output bit-identical across runs (see README).
+    "temperature": None,
+    # SDK retry budget forwarded to every provider chat client. None leaves each
+    # provider/SDK at its own default (usually 2). Raise it to ride out bursty
+    # 429 throttling on rate-limited deployments instead of aborting a run (#1091).
+    "llm_max_retries": None,
+    # Cap on output tokens forwarded to every provider chat client. None leaves
+    # each provider at its own default. Set it to bound a model that emits
+    # unbounded reasoning/output and hangs or trips a gateway idle timeout
+    # (e.g. some deepseek-v4-flash deployments, #1204).
+    "max_tokens": None,
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.
     "checkpoint_enabled": False,
@@ -240,12 +282,18 @@ DEFAULT_CONFIG = apply_market_profile(_apply_env_overrides({
         "oil commodities supply chain energy",
     ],
     # Data vendor configuration (US / non-CN tickers; CN overrides via apply_market_profile)
-    # Requires ALPHA_VANTAGE_API_KEY in .env — no Yahoo/yfinance fallback for US routes.
+    # Category-level configuration (default for all tools in category).
+    # The configured value is the exact vendor chain — requests are NOT silently
+    # routed to vendors you didn't choose. For ordered fallback, list several,
+    # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
+    # alpha_vantage requires ALPHA_VANTAGE_API_KEY in .env.
     "data_vendors": {
-        "core_stock_apis": "alpha_vantage",
-        "technical_indicators": "alpha_vantage",
-        "fundamental_data": "alpha_vantage",
-        "news_data": "alpha_vantage",
+        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
+        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
+        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
+        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
+        "prediction_markets": "polymarket",  # Options: polymarket (keyless)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {

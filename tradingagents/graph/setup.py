@@ -1,10 +1,25 @@
 # TradingAgents/graph/setup.py
 
-from typing import Any, Dict
+from typing import Any
+
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from tradingagents.agents import *
+from tradingagents.agents import (
+    create_aggressive_debator,
+    create_bear_researcher,
+    create_bull_researcher,
+    create_conservative_debator,
+    create_fundamentals_analyst,
+    create_market_analyst,
+    create_msg_delete,
+    create_neutral_debator,
+    create_news_analyst,
+    create_portfolio_manager,
+    create_research_manager,
+    create_sentiment_analyst,
+    create_trader,
+)
 from tradingagents.agents.utils.agent_states import AgentState
 
 from tradingagents.agents.utils.analyst_threads import create_thread_tool_node, create_analyst_clear_node
@@ -14,6 +29,22 @@ from .analyst_join import ANALYST_JOIN_NODE, analysts_join_node
 from .analyst_quality_gate import ANALYST_QUALITY_GATE_NODE, analyst_quality_gate_node
 from .conditional_logic import ConditionalLogic
 
+# Every target a shared conditional router can return. Each edge driven by the
+# router maps all of them, so a fall-through return (e.g. under prompt/i18n/
+# refactor drift in the speaker labels) can never hit a missing path_map entry
+# and crash LangGraph mid-run (#1088).
+DEBATE_PATH_MAP = {
+    "Bull Researcher": "Bull Researcher",
+    "Bear Researcher": "Bear Researcher",
+    "Research Manager": "Research Manager",
+}
+RISK_ANALYSIS_PATH_MAP = {
+    "Aggressive Analyst": "Aggressive Analyst",
+    "Conservative Analyst": "Conservative Analyst",
+    "Neutral Analyst": "Neutral Analyst",
+    "Portfolio Manager": "Portfolio Manager",
+}
+
 
 class GraphSetup:
     """Handles the setup and configuration of the agent graph."""
@@ -22,7 +53,7 @@ class GraphSetup:
         self,
         quick_thinking_llm: Any,
         deep_thinking_llm: Any,
-        tool_nodes: Dict[str, ToolNode],
+        tool_nodes: dict[str, ToolNode],
         conditional_logic: ConditionalLogic,
         analyst_concurrency_limit: int = 1,
     ):
@@ -34,7 +65,7 @@ class GraphSetup:
         self.analyst_concurrency_limit = analyst_concurrency_limit
 
     def setup_graph(
-        self, selected_analysts=["market", "social", "news", "fundamentals"]
+        self, selected_analysts=("market", "social", "news", "fundamentals")
     ):
         """Set up and compile the agent workflow graph.
 
@@ -45,10 +76,7 @@ class GraphSetup:
                 - "news": News analyst
                 - "fundamentals": Fundamentals analyst
         """
-        plan = build_analyst_execution_plan(
-            selected_analysts,
-            concurrency_limit=self.analyst_concurrency_limit,
-        )
+        plan = build_analyst_execution_plan(selected_analysts)
         self.conditional_logic.analyst_report_keys = [
             spec.report_key for spec in plan.specs
         ]
@@ -149,49 +177,22 @@ class GraphSetup:
 
         workflow.add_edge(ANALYST_QUALITY_GATE_NODE, "Bull Researcher")
 
-        # Add remaining edges
-        workflow.add_conditional_edges(
-            "Bull Researcher",
-            self.conditional_logic.should_continue_debate,
-            {
-                "Bear Researcher": "Bear Researcher",
-                "Research Manager": "Research Manager",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Bear Researcher",
-            self.conditional_logic.should_continue_debate,
-            {
-                "Bull Researcher": "Bull Researcher",
-                "Research Manager": "Research Manager",
-            },
-        )
+        # Both research-debate edges share the complete DEBATE_PATH_MAP (#1088).
+        for debate_node in ("Bull Researcher", "Bear Researcher"):
+            workflow.add_conditional_edges(
+                debate_node,
+                self.conditional_logic.should_continue_debate,
+                DEBATE_PATH_MAP,
+            )
         workflow.add_edge("Research Manager", "Trader")
         workflow.add_edge("Trader", "Aggressive Analyst")
-        workflow.add_conditional_edges(
-            "Aggressive Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Conservative Analyst": "Conservative Analyst",
-                "Portfolio Manager": "Portfolio Manager",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Conservative Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Neutral Analyst": "Neutral Analyst",
-                "Portfolio Manager": "Portfolio Manager",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Neutral Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Aggressive Analyst": "Aggressive Analyst",
-                "Portfolio Manager": "Portfolio Manager",
-            },
-        )
+        # All three risk edges share the complete RISK_ANALYSIS_PATH_MAP (#1088).
+        for risk_node in ("Aggressive Analyst", "Conservative Analyst", "Neutral Analyst"):
+            workflow.add_conditional_edges(
+                risk_node,
+                self.conditional_logic.should_continue_risk_analysis,
+                RISK_ANALYSIS_PATH_MAP,
+            )
 
         workflow.add_edge("Portfolio Manager", END)
 

@@ -1,11 +1,10 @@
-from tradingagents.agents.utils.agent_utils import get_language_instruction
+from tradingagents.agents.utils.agent_utils import (
+    get_language_instruction,
+    opponent_argument_or_opening,
+)
 from tradingagents.agents.utils.past_context import past_context_prompt_block
 from tradingagents.agents.utils.position_context import get_position_assumption_instruction
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
-from tradingagents.graph.debate_context import (
-    format_investment_debate_history,
-    maybe_refresh_investment_summary,
-)
 
 
 def _safe_report(text: str) -> str:
@@ -15,10 +14,19 @@ def _safe_report(text: str) -> str:
 
 def create_bear_researcher(llm):
     def bear_node(state) -> dict:
+        # Imported here, not at module level: tradingagents.graph imports this
+        # package (circular import).
+        from tradingagents.graph.debate_context import (
+            format_investment_debate_history,
+            maybe_refresh_investment_summary,
+        )
+
         investment_debate_state = state["investment_debate_state"]
         raw_history = investment_debate_state.get("history", "")
         bear_history = investment_debate_state.get("bear_history", "")
-        current_response = investment_debate_state.get("current_response", "")
+        current_response = opponent_argument_or_opening(
+            investment_debate_state.get("current_response", ""), "bull analyst"
+        )
         market_research_report = _safe_report(state["market_report"])
         sentiment_report = _safe_report(state["sentiment_report"])
         news_report = _safe_report(state["news_report"])

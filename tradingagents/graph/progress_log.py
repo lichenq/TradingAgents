@@ -258,5 +258,10 @@ class GraphProgressLogger:
             self._stop_heartbeat()
 
         if not final_state:
+            # Graph produced nothing via streaming (e.g. a custom/test graph
+            # that only implements invoke()); fall back before giving up.
+            invoke_args = {k: v for k, v in stream_args.items() if k != "stream_mode"}
+            final_state = graph.invoke(init_state, **invoke_args)
+        if not final_state:
             raise RuntimeError("Graph stream produced no final state")
         return final_state

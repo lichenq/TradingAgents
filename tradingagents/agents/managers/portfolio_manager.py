@@ -20,13 +20,12 @@ from tradingagents.agents.utils.position_context import (
     is_retail_position,
 )
 from tradingagents.agents.utils.structured import (
+    NO_EXTERNAL_TOOLS,
     bind_structured,
     invoke_structured_or_freetext,
 )
 from tradingagents.agents.utils.verified_facts import append_verified_market_facts
-from tradingagents.dataflows.audit_pm_context import format_audit_kpi_mandate
 from tradingagents.dataflows.config import get_config
-from tradingagents.graph.debate_context import format_risk_debate_history
 
 
 def _build_gatekeeping_mandate() -> str:
@@ -85,6 +84,11 @@ def create_portfolio_manager(llm):
     structured_llm = bind_structured(llm, PortfolioDecision, "Portfolio Manager")
 
     def portfolio_manager_node(state) -> dict:
+        # Imported here, not at module level: these modules pull in
+        # tradingagents.graph, which imports this package (circular import).
+        from tradingagents.dataflows.audit_pm_context import format_audit_kpi_mandate
+        from tradingagents.graph.debate_context import format_risk_debate_history
+
         instrument_context = build_instrument_context(state["company_of_interest"])
 
         history = format_risk_debate_history(state, llm)
@@ -142,9 +146,9 @@ def create_portfolio_manager(llm):
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts. Critically evaluate their fact-credibility and logic chain reliability.
+Ground every conclusion in specific evidence from the analysts. Critically evaluate their fact-credibility and logic chain reliability. Commit to a directional call only when the evidence clearly supports one; choose Hold when the case is balanced, materially conflicting, ambiguous, or insufficient to justify changing exposure, rather than forcing a direction to appear decisive. Weigh the analysts on their merits, independent of speaking order.
 Populate evidence_citations with 2-5 items quoting verified facts or named analyst findings; never invent PE/PB/price.
-When a Tuige position_grade mandate is provided above, set position_grade to that exact value and reflect it in executive_summary sizing.{get_language_instruction()}"""
+When a Tuige position_grade mandate is provided above, set position_grade to that exact value and reflect it in executive_summary sizing.{NO_EXTERNAL_TOOLS}{get_language_instruction()}"""
 
         prompt = append_verified_market_facts(prompt, state)
         final_trade_decision = invoke_structured_or_freetext(
